@@ -160,6 +160,13 @@
             </execution>
           </executions>
         </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-checkstyle-plugin</artifactId>
+          <configuration>
+            <skip>true</skip>
+          </configuration>
+        </plugin>
       </plugins>
 	</build>
 	</profile>
@@ -184,6 +191,7 @@
     <module>uniquecount</module>
     <module>r</module>
     <module>echoserver</module>
+    <module>iteration</module>
   </modules>
 
   <dependencies>

@@ -20,6 +20,7 @@ package com.datatorrent.lib.io.fs;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
@@ -51,6 +52,7 @@ import com.datatorrent.lib.helper.OperatorContextTestHelper;
 import com.datatorrent.lib.io.IdempotentStorageManager;
 import com.datatorrent.lib.io.block.BlockMetadata;
 import com.datatorrent.lib.testbench.CollectorTestSink;
+import com.datatorrent.lib.util.KryoCloneUtils;
 import com.datatorrent.lib.util.TestUtils;
 
 /**
@@ -70,7 +72,7 @@ public class FileSplitterInputTest
       }
       allLines.addAll(lines);
       File created = new File(dataDirectory, "file" + file + ".txt");
-      filePaths.add(new Path(dataDirectory, created.getName()).toUri().toString());
+      filePaths.add(created.getAbsolutePath());
       FileUtils.write(created, StringUtils.join(lines, '\n'));
     }
     return filePaths;
@@ -453,6 +455,95 @@ public class FileSplitterInputTest
     Assert.assertEquals("File metadata count", 1, testMeta.fileMetadataSink.collectedTuples.size());
     Assert.assertEquals("File metadata", new File(testMeta.dataDirectory + "/file1.txt").getAbsolutePath(),
         testMeta.fileMetadataSink.collectedTuples.get(0).getFilePath());
+  }
+
+  @Test
+  public void testRecoveryOfBlockMetadataIterator() throws InterruptedException
+  {
+    IdempotentStorageManager.FSIdempotentStorageManager fsIdempotentStorageManager =
+        new IdempotentStorageManager.FSIdempotentStorageManager();
+
+    testMeta.fileSplitterInput.setIdempotentStorageManager(fsIdempotentStorageManager);
+    testMeta.fileSplitterInput.setBlockSize(2L);
+    testMeta.fileSplitterInput.setBlocksThreshold(2);
+    testMeta.fileSplitterInput.getScanner().setScanIntervalMillis(500);
+
+
+    testMeta.fileSplitterInput.setup(testMeta.context);
+
+    testMeta.fileSplitterInput.beginWindow(1);
+
+    ((MockScanner)testMeta.fileSplitterInput.getScanner()).semaphore.acquire();
+    testMeta.fileSplitterInput.emitTuples();
+    testMeta.fileSplitterInput.endWindow();
+
+    //file0.txt has just 5 blocks. Since blocks threshold is 2, only 2 are emitted.
+    Assert.assertEquals("Files", 1, testMeta.fileMetadataSink.collectedTuples.size());
+    Assert.assertEquals("Blocks", 2, testMeta.blockMetadataSink.collectedTuples.size());
+
+    testMeta.fileMetadataSink.clear();
+    testMeta.blockMetadataSink.clear();
+
+    //At this point the operator was check-pointed and then there was a failure.
+    testMeta.fileSplitterInput.teardown();
+
+    //The operator was restored from persisted state and re-deployed.
+    testMeta.fileSplitterInput = KryoCloneUtils.cloneObject(testMeta.fileSplitterInput);
+    TestUtils.setSink(testMeta.fileSplitterInput.blocksMetadataOutput, testMeta.blockMetadataSink);
+    TestUtils.setSink(testMeta.fileSplitterInput.filesMetadataOutput, testMeta.fileMetadataSink);
+
+    testMeta.fileSplitterInput.setup(testMeta.context);
+    testMeta.fileSplitterInput.beginWindow(1);
+
+    Assert.assertEquals("Recovered Files", 1, testMeta.fileMetadataSink.collectedTuples.size());
+    Assert.assertEquals("Recovered Blocks", 2, testMeta.blockMetadataSink.collectedTuples.size());
+  }
+
+  @Test
+  public void testFileModificationTest() throws InterruptedException, IOException, TimeoutException
+  {
+    testMeta.fileSplitterInput.getScanner().setScanIntervalMillis(60 * 1000);
+    testFileMetadata();
+    testMeta.fileMetadataSink.clear();
+    testMeta.blockMetadataSink.clear();
+
+    Thread.sleep(1000);
+    //change a file , this will not change mtime of the file.
+    File f12 = new File(testMeta.dataDirectory, "file11" + ".txt");
+    HashSet<String> lines = Sets.newHashSet();
+    for (int line = 0; line < 2; line++) {
+      lines.add("f13" + "l" + line);
+    }
+    /* Need to use FileWriter, FileUtils changes the directory timestamp when
+       file is changed. */
+    FileWriter fout = new FileWriter(f12, true);
+    fout.write(StringUtils.join(lines, '\n').toCharArray());
+    fout.close();
+    testMeta.fileSplitterInput.getScanner().setTrigger(true);
+
+    //window 2
+    testMeta.fileSplitterInput.beginWindow(2);
+    testMeta.scanner.semaphore.acquire();
+    testMeta.fileSplitterInput.emitTuples();
+    testMeta.fileSplitterInput.endWindow();
+
+    Assert.assertEquals("window 2: files", 1, testMeta.fileMetadataSink.collectedTuples.size());
+    Assert.assertEquals("window 2: blocks", 1, testMeta.blockMetadataSink.collectedTuples.size());
+
+    //window 3
+    testMeta.fileMetadataSink.clear();
+    testMeta.blockMetadataSink.clear();
+    testMeta.scanner.setTrigger(true);
+    testMeta.scanner.semaphore.release();
+    testMeta.fileSplitterInput.beginWindow(3);
+    Thread.sleep(1000);
+    testMeta.scanner.semaphore.acquire();
+    testMeta.fileSplitterInput.emitTuples();
+    testMeta.fileSplitterInput.endWindow();
+
+    Assert.assertEquals("window 2: files", 0, testMeta.fileMetadataSink.collectedTuples.size());
+    Assert.assertEquals("window 2: blocks", 0, testMeta.blockMetadataSink.collectedTuples.size());
+
   }
 
   private static class MockScanner extends FileSplitterInput.TimeBasedDirectoryScanner

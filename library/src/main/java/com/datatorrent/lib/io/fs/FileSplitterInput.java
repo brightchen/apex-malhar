@@ -292,6 +292,9 @@ public class FileSplitterInput extends AbstractFileSplitter implements InputOper
     private transient ScannedFileInfo lastScannedInfo;
     private transient int numDiscoveredPerIteration;
 
+    @NotNull
+    protected final Map<String, Map<String, Long>> inputDirTolastModifiedTimes;
+
     public TimeBasedDirectoryScanner()
     {
       recursive = true;
@@ -301,6 +304,7 @@ public class FileSplitterInput extends AbstractFileSplitter implements InputOper
       discoveredFiles = new LinkedBlockingDeque<>();
       atomicThrowable = new AtomicReference<>();
       ignoredFiles = Sets.newHashSet();
+      inputDirTolastModifiedTimes = Maps.newHashMap();
     }
 
     @Override
@@ -360,7 +364,9 @@ public class FileSplitterInput extends AbstractFileSplitter implements InputOper
             lastScannedInfo = null;
             numDiscoveredPerIteration = 0;
             for (String afile : files) {
-              scan(new Path(afile), null);
+              Map<String, Long> lastModifiedTimesForInputDir;
+              lastModifiedTimesForInputDir = getLastModifiedTimeMap(afile);
+              scan(new Path(afile), null, lastModifiedTimesForInputDir);
             }
             scanIterationComplete();
           } else {
@@ -375,6 +381,15 @@ public class FileSplitterInput extends AbstractFileSplitter implements InputOper
       }
     }
 
+    private Map<String, Long> getLastModifiedTimeMap(String key)
+    {
+      if (inputDirTolastModifiedTimes.get(key) == null) {
+        Map<String, Long> modifiedTimeMap = Maps.newHashMap();
+        inputDirTolastModifiedTimes.put(key, modifiedTimeMap);
+      }
+      return inputDirTolastModifiedTimes.get(key);
+    }
+
     /**
      * Operations that need to be done once a scan is complete.
      */
@@ -386,6 +401,13 @@ public class FileSplitterInput extends AbstractFileSplitter implements InputOper
 
     protected void scan(@NotNull Path filePath, Path rootPath)
     {
+      Map<String, Long> lastModifiedTimesForInputDir;
+      lastModifiedTimesForInputDir = getLastModifiedTimeMap(filePath.toUri().getPath());
+      scan(filePath, rootPath, lastModifiedTimesForInputDir);
+    }
+
+    private void scan(Path filePath, Path rootPath, Map<String, Long> lastModifiedTimesForInputDir)
+    {
       try {
         FileStatus parentStatus = fs.getFileStatus(filePath);
         String parentPathStr = filePath.toUri().getPath();
@@ -393,27 +415,22 @@ public class FileSplitterInput extends AbstractFileSplitter implements InputOper
         LOG.debug("scan {}", parentPathStr);
 
         FileStatus[] childStatuses = fs.listStatus(filePath);
-        for (FileStatus status : childStatuses) {
-          Path childPath = status.getPath();
-          ScannedFileInfo info = createScannedFileInfo(filePath, parentStatus, childPath, status, rootPath);
 
-          if (skipFile(childPath, status.getModificationTime(), referenceTimes.get(info.getFilePath()))) {
-            continue;
-          }
+        if (childStatuses.length == 0 && rootPath == null && lastModifiedTimesForInputDir.get(parentPathStr) == null) { // empty input directory copy as is
+          ScannedFileInfo info = new ScannedFileInfo(null, filePath.toString(), parentStatus.getModificationTime());
+          processDiscoveredFile(info);
+          lastModifiedTimesForInputDir.put(parentPathStr, parentStatus.getModificationTime());
+        }
 
-          if (status.isDirectory()) {
-            if (recursive) {
-              scan(childPath, rootPath == null ? parentStatus.getPath() : rootPath);
-            }
-          }
-
+        for (FileStatus childStatus : childStatuses) {
+          Path childPath = childStatus.getPath();
           String childPathStr = childPath.toUri().getPath();
-          if (ignoredFiles.contains(childPathStr)) {
-            continue;
-          }
-          if (acceptFile(childPathStr)) {
-            LOG.debug("found {}", childPathStr);
-            processDiscoveredFile(info);
+
+          if (childStatus.isDirectory() && isRecursive()) {
+            addToDiscoveredFiles(rootPath, parentStatus, childStatus, lastModifiedTimesForInputDir);
+            scan(childPath, rootPath == null ? parentStatus.getPath() : rootPath, lastModifiedTimesForInputDir);
+          } else if (acceptFile(childPathStr)) {
+            addToDiscoveredFiles(rootPath, parentStatus, childStatus, lastModifiedTimesForInputDir);
           } else {
             // don't look at it again
             ignoredFiles.add(childPathStr);
@@ -426,6 +443,31 @@ public class FileSplitterInput extends AbstractFileSplitter implements InputOper
       }
     }
 
+    private void addToDiscoveredFiles(Path rootPath, FileStatus parentStatus, FileStatus childStatus,
+        Map<String, Long> lastModifiedTimesForInputDir) throws IOException
+    {
+      Path childPath = childStatus.getPath();
+      String childPathStr = childPath.toUri().getPath();
+      // Directory by now is scanned forcibly. Now check for whether file/directory needs to be added to discoveredFiles.
+      Long oldModificationTime = lastModifiedTimesForInputDir.get(childPathStr);
+      lastModifiedTimesForInputDir.put(childPathStr, childStatus.getModificationTime());
+
+      if (skipFile(childPath, childStatus.getModificationTime(), oldModificationTime) || // Skip dir or file if no timestamp modification
+          (childStatus.isDirectory() && (oldModificationTime != null))) { // If timestamp modified but if its a directory and already present in map, then skip.
+        return;
+      }
+
+      if (ignoredFiles.contains(childPathStr)) {
+        return;
+      }
+
+      ScannedFileInfo info = createScannedFileInfo(parentStatus.getPath(), parentStatus, childPath, childStatus,
+          rootPath);
+
+      LOG.debug("Processing file: " + info.getFilePath());
+      processDiscoveredFile(info);
+    }
+
     protected void processDiscoveredFile(ScannedFileInfo info)
     {
       numDiscoveredPerIteration++;
@@ -434,17 +476,17 @@ public class FileSplitterInput extends AbstractFileSplitter implements InputOper
     }
 
     protected ScannedFileInfo createScannedFileInfo(Path parentPath, FileStatus parentStatus, Path childPath,
-        @SuppressWarnings("UnusedParameters") FileStatus childStatus, Path rootPath)
+        FileStatus childStatus, Path rootPath)
     {
       ScannedFileInfo info;
       if (rootPath == null) {
         info = parentStatus.isDirectory() ?
-          new ScannedFileInfo(parentPath.toUri().getPath(), childPath.getName(), parentStatus.getModificationTime()) :
-          new ScannedFileInfo(null, childPath.toUri().getPath(), parentStatus.getModificationTime());
+          new ScannedFileInfo(parentPath.toUri().getPath(), childPath.getName(), childStatus.getModificationTime()) :
+          new ScannedFileInfo(null, childPath.toUri().getPath(), childStatus.getModificationTime());
       } else {
         URI relativeChildURI = rootPath.toUri().relativize(childPath.toUri());
         info = new ScannedFileInfo(rootPath.toUri().getPath(), relativeChildURI.getPath(),
-            parentStatus.getModificationTime());
+          childStatus.getModificationTime());
       }
       return info;
     }
@@ -619,4 +661,5 @@ public class FileSplitterInput extends AbstractFileSplitter implements InputOper
   }
 
   private static final Logger LOG = LoggerFactory.getLogger(FileSplitterInput.class);
+
 }

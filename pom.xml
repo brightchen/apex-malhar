@@ -67,6 +67,8 @@
             <exclude>**/src/main/resources/com/datatorrent/apps/logstream/**</exclude>
             <exclude>src/main/c/zmq_push/Makefile</exclude>
             <exclude>src/test/resources/com/datatorrent/contrib/romesyndication/*.rss</exclude>
+            <exclude>**/*.md</exclude>
+            <exclude>**/*.yml</exclude>
           </excludes>
           <mapping combine.children="append">
             <R>SCRIPT_STYLE</R>
@@ -87,14 +89,8 @@
             <exclude>src/main/resources/**/*.txt</exclude>
             <exclude>**/*.json</exclude>
             <exclude>**/*.md</exclude>
+            <exclude>**/*.yml</exclude>
           </excludes>
-        </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-checkstyle-plugin</artifactId>
-        <configuration>
-          <maxAllowedViolations>15967</maxAllowedViolations>
         </configuration>
       </plugin>
     </plugins>
@@ -126,12 +122,8 @@
               <includeSynthetic>false</includeSynthetic>
               <ignoreMissingClasses>true</ignoreMissingClasses>
               <excludes>
-                <exclude>@org.apache.hadoop.classification.InterfaceStability.Evolving</exclude>
-                <exclude>@org.apache.hadoop.classification.InterfaceStability.Unstable</exclude>
-                <exclude>com.datatorrent.lib.parser.JsonParser</exclude>
-                <exclude>com.datatorrent.lib.parser.Parser</exclude>
-                <exclude>com.datatorrent.lib.parser.XmlParser</exclude>
-                <exclude>com.datatorrent.contrib.parser.CsvParser</exclude>
+                <exclude>@org.apache.hadoop.classification.InterfaceStability$Evolving</exclude>
+                <exclude>@org.apache.hadoop.classification.InterfaceStability$Unstable</exclude>
               </excludes>
             </parameter>
             <skip>${semver.plugin.skip}</skip>
@@ -144,6 +136,13 @@
               </goals>
             </execution>
           </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-checkstyle-plugin</artifactId>
+          <configuration>
+            <consoleOutput>true</consoleOutput>
+          </configuration>
         </plugin>
       </plugins>
     </pluginManagement>
