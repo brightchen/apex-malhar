@@ -23,15 +23,19 @@ import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
+import org.joda.time.Duration;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestWatcher;
 import org.junit.runner.Description;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.datatorrent.api.Context;
 import com.datatorrent.lib.fileaccess.FileAccessFSImpl;
 import com.datatorrent.lib.util.KryoCloneUtils;
+import com.datatorrent.lib.util.TestUtils;
 import com.datatorrent.netlet.util.Slice;
 
 public class ManagedStateImplTest
@@ -46,7 +50,7 @@ public class ManagedStateImplTest
     @Override
     protected void starting(Description description)
     {
-      ManagedStateTestUtils.cleanTargetDir(description);
+      TestUtils.deleteTargetTestClassFolder(description);
       managedState = new ManagedStateImpl();
       applicationPath = "target/" + description.getClassName() + "/" + description.getMethodName();
       ((FileAccessFSImpl)managedState.getFileAccess()).setBasePath(applicationPath + "/" + "bucket_data");
@@ -57,7 +61,7 @@ public class ManagedStateImplTest
     @Override
     protected void finished(Description description)
     {
-      ManagedStateTestUtils.cleanTargetDir(description);
+      TestUtils.deleteTargetTestClassFolder(description);
     }
   }
 
@@ -146,9 +150,9 @@ public class ManagedStateImplTest
     Slice two = ManagedStateTestUtils.getSliceFor("2");
     commitHelper(one, two);
     Bucket.DefaultBucket defaultBucket = (Bucket.DefaultBucket)testMeta.managedState.getBucket(0);
-    Assert.assertEquals("value of one", one, defaultBucket.getCommittedData().get(one).getValue());
-
-    Assert.assertNull("value of two", defaultBucket.getCommittedData().get(two));
+    Assert.assertEquals("value of one", one, defaultBucket.getCommittedData().firstEntry().getValue().get(one)
+        .getValue());
+    Assert.assertNull("value of two", defaultBucket.getCommittedData().firstEntry().getValue().get(two));
     testMeta.managedState.teardown();
   }
 
@@ -160,6 +164,45 @@ public class ManagedStateImplTest
     commitHelper(one, two);
     Future<Slice> valFuture = testMeta.managedState.getAsync(0, one);
     Assert.assertEquals("value of one", one, valFuture.get());
+  }
+
+  /**
+   * Fix for APEXMALHAR-2042
+   */
+  @Test
+  public void testFreeWindowTransferRaceCondition() throws Exception
+  {
+    testMeta.managedState.setMaxMemorySize(1);
+    testMeta.managedState.setCheckStateSizeInterval(Duration.millis(1L));
+    testMeta.managedState.setCheckStateSizeInterval(Duration.millis(1L));
+    testMeta.managedState.setup(testMeta.operatorContext);
+
+    int numKeys = 300;
+    long lastWindowId = (long)numKeys;
+
+    for (long windowId = 0L; windowId < lastWindowId; windowId++) {
+      testMeta.managedState.beginWindow(windowId);
+      Slice keyVal = ManagedStateTestUtils.getSliceFor(Long.toString(windowId));
+      testMeta.managedState.put(0L, keyVal, keyVal);
+      testMeta.managedState.endWindow();
+      testMeta.managedState.beforeCheckpoint(windowId);
+      testMeta.managedState.checkpointed(windowId);
+      Thread.sleep(1L);
+    }
+
+    testMeta.managedState.committed(lastWindowId - 2L);
+    lastWindowId++;
+
+    testMeta.managedState.beginWindow(lastWindowId);
+
+    for (int key = numKeys - 1; key > 0; key--) {
+      Slice keyVal = ManagedStateTestUtils.getSliceFor(Integer.toString(key));
+      Slice val = testMeta.managedState.getSync(0L, keyVal);
+      Assert.assertNotNull(val);
+    }
+
+    testMeta.managedState.endWindow();
+    testMeta.managedState.teardown();
   }
 
   private void commitHelper(Slice one, Slice two)
@@ -179,4 +222,5 @@ public class ManagedStateImplTest
     testMeta.managedState.committed(time);
   }
 
+  private static final Logger LOG = LoggerFactory.getLogger(ManagedStateImplTest.class);
 }

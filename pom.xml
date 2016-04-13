@@ -51,7 +51,6 @@
     <maven.deploy.skip>false</maven.deploy.skip>
     <apex.core.version>3.3.0-incubating</apex.core.version>
     <semver.plugin.skip>false</semver.plugin.skip>
-    <checkstyle.console>false</checkstyle.console>
   </properties>
 
   <build>
@@ -140,9 +139,13 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-checkstyle-plugin</artifactId>
-          <configuration>
-            <consoleOutput>true</consoleOutput>
-          </configuration>
+          <dependencies>
+            <dependency>
+              <groupId>org.apache.apex</groupId>
+              <artifactId>apex-codestyle-config</artifactId>
+              <version>1.0.0-incubating</version>
+            </dependency>
+          </dependencies>
         </plugin>
       </plugins>
     </pluginManagement>
