@@ -33,9 +33,9 @@
   <packaging>jar</packaging>
 
   <name>Apache Apex Malhar (incubating) Samples</name>
-
   <properties>
     <maven.deploy.skip>true</maven.deploy.skip>
+    <checkstyle.skip>true</checkstyle.skip>
   </properties>
 
   <dependencies>
