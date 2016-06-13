@@ -32,7 +32,7 @@ import javax.validation.constraints.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.apex.malhar.lib.wal.WindowDataManager;
+import org.apache.apex.malhar.lib.wal.FSWindowDataManager;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
@@ -48,8 +48,10 @@ import com.datatorrent.netlet.util.Slice;
  * data files. This class listens to time expiry events issued by {@link TimeBucketAssigner}.
  *
  * This component is also responsible for purging old time buckets.
+ *
+ * @since 3.4.0
  */
-public class IncrementalCheckpointManager extends WindowDataManager.FSWindowDataManager
+public class IncrementalCheckpointManager extends FSWindowDataManager
     implements ManagedStateComponent
 {
   private static final String WAL_RELATIVE_PATH = "managed_state";
@@ -70,6 +72,8 @@ public class IncrementalCheckpointManager extends WindowDataManager.FSWindowData
 
   private transient int waitMillis;
   private volatile long lastTransferredWindow = Stateless.WINDOW_ID;
+
+  private transient long largestWindowAddedToTransferQueue = Stateless.WINDOW_ID;
 
   public IncrementalCheckpointManager()
   {
@@ -188,8 +192,12 @@ public class IncrementalCheckpointManager extends WindowDataManager.FSWindowData
   {
     LOG.debug("data manager committed {}", windowId);
     for (Long currentWindow : savedWindows.keySet()) {
+      if (currentWindow <= largestWindowAddedToTransferQueue) {
+        continue;
+      }
       if (currentWindow <= windowId) {
-        LOG.debug("to transfer {}", windowId);
+        LOG.debug("to transfer {}", currentWindow);
+        largestWindowAddedToTransferQueue = currentWindow;
         windowsToTransfer.add(currentWindow);
       } else {
         break;

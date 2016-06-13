@@ -19,11 +19,14 @@
 package com.datatorrent.lib.db.jdbc;
 
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Time;
+import java.sql.Timestamp;
 import java.util.List;
 
 import javax.annotation.Nonnull;
@@ -70,6 +73,9 @@ public class JdbcOperatorTest
   {
     private int id;
     private String name;
+    private Date startDate;
+    private Time startTime;
+    private Timestamp startTimestamp;
 
     public TestPOJOEvent()
     {
@@ -101,6 +107,36 @@ public class JdbcOperatorTest
       this.name = name;
     }
 
+    public Date getStartDate()
+    {
+      return startDate;
+    }
+
+    public void setStartDate(Date startDate)
+    {
+      this.startDate = startDate;
+    }
+
+    public Time getStartTime()
+    {
+      return startTime;
+    }
+
+    public void setStartTime(Time startTime)
+    {
+      this.startTime = startTime;
+    }
+
+    public Timestamp getStartTimestamp()
+    {
+      return startTimestamp;
+    }
+
+    public void setStartTimestamp(Timestamp startTimestamp)
+    {
+      this.startTimestamp = startTimestamp;
+    }
+
   }
 
   @BeforeClass
@@ -124,7 +160,7 @@ public class JdbcOperatorTest
       String createTable = "CREATE TABLE IF NOT EXISTS " + TABLE_NAME + " (ID INTEGER)";
       stmt.executeUpdate(createTable);
       String createPOJOTable = "CREATE TABLE IF NOT EXISTS " + TABLE_POJO_NAME
-          + "(id INTEGER not NULL,name VARCHAR(255), PRIMARY KEY ( id ))";
+          + "(id INTEGER not NULL,name VARCHAR(255),startDate DATE,startTime TIME,startTimestamp TIMESTAMP, PRIMARY KEY ( id ))";
       stmt.executeUpdate(createPOJOTable);
     } catch (Throwable e) {
       DTThrowable.rethrow(e);
@@ -374,15 +410,18 @@ public class JdbcOperatorTest
     attributeMap.put(DAG.APPLICATION_ID, APP_ID);
     OperatorContextTestHelper.TestIdOperatorContext context = new OperatorContextTestHelper.TestIdOperatorContext(
         OPERATOR_ID, attributeMap);
-
-    insertEventsInTable(10);
+    
+    insertEvents(10,true, 0);
 
     JdbcPOJOInputOperator inputOperator = new JdbcPOJOInputOperator();
     inputOperator.setStore(store);
-    inputOperator.setTableName(TABLE_NAME);
+    inputOperator.setTableName(TABLE_POJO_NAME);
 
     List<FieldInfo> fieldInfos = Lists.newArrayList();
     fieldInfos.add(new FieldInfo("ID", "id", null));
+    fieldInfos.add(new FieldInfo("STARTDATE", "startDate", null));
+    fieldInfos.add(new FieldInfo("STARTTIME", "startTime", null));
+    fieldInfos.add(new FieldInfo("STARTTIMESTAMP", "startTimestamp", null));
     inputOperator.setFieldInfos(fieldInfos);
 
     inputOperator.setFetchSize(5);
@@ -408,6 +447,9 @@ public class JdbcOperatorTest
     for (Object tuple : sink.collectedTuples) {
       TestPOJOEvent pojoEvent = (TestPOJOEvent)tuple;
       Assert.assertTrue("i=" + i, pojoEvent.getId() == i);
+      Assert.assertTrue("date", pojoEvent.getStartDate() instanceof Date);
+      Assert.assertTrue("time", pojoEvent.getStartTime() instanceof Time);
+      Assert.assertTrue("timestamp", pojoEvent.getStartTimestamp() instanceof Timestamp);
       i++;
     }
     sink.collectedTuples.clear();
@@ -420,6 +462,9 @@ public class JdbcOperatorTest
     for (Object tuple : sink.collectedTuples) {
       TestPOJOEvent pojoEvent = (TestPOJOEvent)tuple;
       Assert.assertTrue("i=" + i, pojoEvent.getId() == i);
+      Assert.assertTrue("date", pojoEvent.getStartDate() instanceof Date);
+      Assert.assertTrue("time", pojoEvent.getStartTime() instanceof Time);
+      Assert.assertTrue("timestamp", pojoEvent.getStartTimestamp() instanceof Timestamp);
       i++;
     }
 
@@ -430,6 +475,49 @@ public class JdbcOperatorTest
     inputOperator.endWindow();
 
     Assert.assertEquals("rows from db", 0, sink.collectedTuples.size());
-  }
-}
+    
+    // Insert 3 more tuples and check if they are read successfully.
+    insertEvents(3, false, 10);
 
+    inputOperator.beginWindow(3);
+    inputOperator.emitTuples();
+    inputOperator.endWindow();
+
+    Assert.assertEquals("rows from db", 3, sink.collectedTuples.size());
+    for (Object tuple : sink.collectedTuples) {
+      TestPOJOEvent pojoEvent = (TestPOJOEvent)tuple;
+      Assert.assertTrue("i=" + i, pojoEvent.getId() == i);
+      Assert.assertTrue("date", pojoEvent.getStartDate() instanceof Date);
+      Assert.assertTrue("time", pojoEvent.getStartTime() instanceof Time);
+      Assert.assertTrue("timestamp", pojoEvent.getStartTimestamp() instanceof Timestamp);
+      i++;
+    }
+  }
+  
+
+  private void insertEvents(int numEvents, boolean cleanExistingRows, int startRowId)
+  {
+    try (Connection con = DriverManager.getConnection(URL); Statement stmt = con.createStatement()) {
+      if (cleanExistingRows) {
+        String cleanTable = "delete from " + TABLE_POJO_NAME;
+        stmt.executeUpdate(cleanTable);
+      }
+
+      String insert = "insert into " + TABLE_POJO_NAME + " values (?,?,?,?,?)";
+      PreparedStatement pStmt = con.prepareStatement(insert);
+      con.prepareStatement(insert);
+
+      for (int i = 0; i < numEvents; i++) {
+        pStmt.setInt(1, startRowId + i);
+        pStmt.setString(2, "name");
+        pStmt.setDate(3, new Date(2016, 1, 1));
+        pStmt.setTime(4, new Time(2016, 1, 1));
+        pStmt.setTimestamp(5, new Timestamp(2016, 1, 1, 0, 0, 0, 0));
+        pStmt.executeUpdate();
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+}

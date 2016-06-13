@@ -56,7 +56,7 @@ public class FSWindowDataManagerTest
   {
 
     String applicationPath;
-    WindowDataManager.FSWindowDataManager storageManager;
+    FSWindowDataManager storageManager;
     Context.OperatorContext context;
 
     @Override
@@ -64,7 +64,7 @@ public class FSWindowDataManagerTest
     {
       TestUtils.deleteTargetTestClassFolder(description);
       super.starting(description);
-      storageManager = new WindowDataManager.FSWindowDataManager();
+      storageManager = new FSWindowDataManager();
       applicationPath = "target/" + description.getClassName() + "/" + description.getMethodName();
 
       Attribute.AttributeMap.DefaultAttributeMap attributes = new Attribute.AttributeMap.DefaultAttributeMap();
@@ -154,6 +154,25 @@ public class FSWindowDataManagerTest
 
     testMeta.storageManager.setup(testMeta.context);
     Assert.assertEquals("largest recovery window", 2, testMeta.storageManager.getLargestRecoveryWindow());
+    testMeta.storageManager.teardown();
+  }
+
+  @Test
+  public void testGetWindowIds() throws IOException
+  {
+    testMeta.storageManager.setup(testMeta.context);
+    Map<Integer, String> data = Maps.newHashMap();
+    data.put(1, "one");
+    data.put(2, "two");
+    data.put(3, "three");
+
+    testMeta.storageManager.save(data, 1, 1);
+    testMeta.storageManager.save(data, 2, 2);
+
+    testMeta.storageManager.setup(testMeta.context);
+
+    Assert.assertArrayEquals(new long[] {1, 2}, testMeta.storageManager.getWindowIds());
+
     testMeta.storageManager.teardown();
   }
 
