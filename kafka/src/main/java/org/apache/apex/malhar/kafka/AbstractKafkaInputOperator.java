@@ -225,6 +225,8 @@ public abstract class AbstractKafkaInputOperator implements InputOperator, Opera
     for (int i = 0; i < count; i++) {
       Pair<String, ConsumerRecord<byte[], byte[]>> tuple = consumerWrapper.pollMessage();
       ConsumerRecord<byte[], byte[]> msg = tuple.getRight();
+      logger.info("====emitTuples(), instance: {}; index: {}, cluster: {}, key: {}, value: {}", 
+          System.identityHashCode(this), i, tuple.getLeft(), new String(msg.key()), new String(msg.value()));
       emitTuple(tuple.getLeft(), msg);
       AbstractKafkaPartitioner.PartitionMeta pm = new AbstractKafkaPartitioner.PartitionMeta(tuple.getLeft(),
           msg.topic(), msg.partition());
@@ -241,6 +243,7 @@ public abstract class AbstractKafkaInputOperator implements InputOperator, Opera
   @Override
   public void beginWindow(long wid)
   {
+    logger.info("====beginWindow(), instance: {}", System.identityHashCode(this));
     emitCount = 0;
     currentWindowId = wid;
     windowStartOffset.clear();
@@ -291,6 +294,7 @@ public abstract class AbstractKafkaInputOperator implements InputOperator, Opera
   @Override
   public void setup(Context.OperatorContext context)
   {
+    logger.info("====setup(), instance: {}", System.identityHashCode(this));
     applicationName = context.getValue(Context.DAGContext.APPLICATION_NAME);
     consumerWrapper.create(this);
     metrics = new KafkaMetrics(metricsRefreshInterval);
