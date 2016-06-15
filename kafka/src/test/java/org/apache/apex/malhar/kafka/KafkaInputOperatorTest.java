@@ -63,7 +63,7 @@ public class KafkaInputOperatorTest extends KafkaOperatorTestBase
 
   private String partition = null;
 
-  private String testName = "";
+  private transient String testName = "";
 
   public static String APPLICATION_PATH = baseDir + File.separator + StramLocalCluster.class.getName() + File.separator;
 
@@ -108,7 +108,7 @@ public class KafkaInputOperatorTest extends KafkaOperatorTestBase
   private static final org.slf4j.Logger logger = LoggerFactory.getLogger(KafkaInputOperatorTest.class);
   private static List<String> tupleCollection = new LinkedList<>();
 
-  private static final int scale = 100;
+  private static final int scale = 10;
   private static final int totalCount = 10 * scale;
   private static final int failureTrigger = 3 * scale;
   private static final int tuplesPerWindow = 5 * scale;
@@ -299,14 +299,13 @@ public class KafkaInputOperatorTest extends KafkaOperatorTestBase
     lc.setHeartbeatMonitoringEnabled(false);
 
     lc.runAsync();
-
-
     
     // Wait 60s for consumer finish consuming all the messages
     boolean notTimeout = latch.await(waitTime, TimeUnit.MILLISECONDS);
+    lc.shutdown();
     
-    logger.info("====Number of emitted tuples(1): {}", tupleCollection.size());
-    Assert.assertTrue("TIMEOUT. Collected data: " + tupleCollection, notTimeout);
+    logger.info("====Number of emitted tuples: {}, testName: {}", tupleCollection.size(), testName);
+    Assert.assertTrue("TIMEOUT. testName: " + this.testName + "; Collected data: " + tupleCollection, notTimeout);
 
     //waitMillis(500);
     
@@ -319,14 +318,11 @@ public class KafkaInputOperatorTest extends KafkaOperatorTestBase
       }
     });
 
-    logger.info("====Number of emitted tuples(2): {}", tupleCollection.size());
-    
     // Check results
-    Assert.assertTrue("Collected tuple size: " + tupleCollection.size() + "; Expected tuple size: " + totalCount + "; data: \n" + tupleCollection, 
+    Assert.assertTrue( "testName: " + testName + "; Collected tuple size: " + tupleCollection.size() + "; Expected tuple size: " + totalCount + "; data: \n" + tupleCollection, 
         totalCount == tupleCollection.size());
-    logger.debug(String.format("Number of emitted tuples: %d", tupleCollection.size()));
-
-    lc.shutdown();
+    
+    logger.info("====End of test case: {}", testName);
   }
 
   protected void waitMillis(long millis)
