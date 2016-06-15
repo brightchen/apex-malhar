@@ -122,7 +122,7 @@ public class KafkaTestProducer implements Runnable
       // logger.debug(String.format("Producing %s", messageStr));
     }
     // produce the end tuple to let the test input operator know it's done produce messages
-    for (int i = 0; i < (hasPartition ? 1 : 2); ++i) {
+    for (int i = 0; i < (hasPartition ? 2 : 1); ++i) {
       sendTasks.add(producer.send(new ProducerRecord<>(topic, "" + 0, KafkaOperatorTestBase.END_TUPLE)));
       if (hasMultiCluster) {
         sendTasks.add(producer1.send(new ProducerRecord<>(topic, "" + 0, KafkaOperatorTestBase.END_TUPLE)));

@@ -243,7 +243,6 @@ public abstract class AbstractKafkaInputOperator implements InputOperator, Opera
   @Override
   public void beginWindow(long wid)
   {
-    logger.info("====beginWindow(), instance: {}", System.identityHashCode(this));
     emitCount = 0;
     currentWindowId = wid;
     windowStartOffset.clear();
