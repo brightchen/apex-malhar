@@ -129,10 +129,17 @@ public class KafkaConsumerWrapper implements Closeable
         if (meta.getTopicPartition().equals(tp)) {
           kc.resume(tp);
         } else {
+          try {
+            kc.position(tp);
+          } catch (NoOffsetForPartitionException e) {
+            kc.seekToBeginning(tp);
+          }
+
           kc.pause(tp);
         }
       }
       // set the offset to window start offset
+      logger.info("====seek to: partition: {}, offset: {}", meta.getTopicPartition(), replayOffsetSize.getLeft());
       kc.seek(meta.getTopicPartition(), replayOffsetSize.getLeft());
       long windowCount = replayOffsetSize.getRight();
       while (windowCount > 0) {

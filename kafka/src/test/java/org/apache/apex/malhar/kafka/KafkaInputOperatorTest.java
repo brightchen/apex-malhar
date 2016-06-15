@@ -34,7 +34,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -50,8 +49,6 @@ import com.datatorrent.api.DefaultInputPort;
 import com.datatorrent.api.LocalMode;
 import com.datatorrent.common.util.BaseOperator;
 import com.datatorrent.stram.StramLocalCluster;
-
-import jline.internal.Log;
 
 /**
  * A bunch of test to verify the input operator will be automatically partitioned per kafka partition This test is launching its
@@ -77,9 +74,9 @@ public class KafkaInputOperatorTest extends KafkaOperatorTestBase
       {true, false, "one_to_one"},// multi cluster with single partition
       {true, false, "one_to_many"},
       {true, true, "one_to_one"},// multi cluster with multi partitions
-//      {true, true, "one_to_many"},   //test failed, no data received.
+      {true, true, "one_to_many"},   //test failed, no data received.
       {false, true, "one_to_one"}, // single cluster with multi partitions
-//      {false, true, "one_to_many"},  //test failed, no data received.
+      {false, true, "one_to_many"},  //test failed, no data received.
       {false, false, "one_to_one"}, // single cluster with single partitions
       {false, false, "one_to_many"}
     });
@@ -111,12 +108,14 @@ public class KafkaInputOperatorTest extends KafkaOperatorTestBase
   private static final org.slf4j.Logger logger = LoggerFactory.getLogger(KafkaInputOperatorTest.class);
   private static List<String> tupleCollection = new LinkedList<>();
 
-  private static final int scale = 1;
+  private static final int scale = 100;
   private static final int totalCount = 10 * scale;
   private static final int failureTrigger = 3 * scale;
   private static final int tuplesPerWindow = 5 * scale;
-  private static final int waitTime = 20000 + 300 * scale;
-      
+  private static final int waitTime = 60000 + 300 * scale;
+  
+  //This latch was used to count the END_TUPLE, but the order of tuple can't be guaranteed, 
+  //so, count valid tuple instead.
   private static CountDownLatch latch;
   private static boolean hasFailure = false;
   private static int k = 0;
@@ -166,7 +165,7 @@ public class KafkaInputOperatorTest extends KafkaOperatorTestBase
     public void processTuple(byte[] bt)
     {
       String tuple = new String(bt);
-      Log.info("====processTuple(): {}", tuple);
+      logger.info("====processTuple(): {}", tuple);
       if (hasFailure && k++ == failureTrigger) {
         //you can only kill yourself once
         hasFailure = false;
@@ -197,13 +196,15 @@ public class KafkaInputOperatorTest extends KafkaOperatorTestBase
       }
 
       //discard the tuples of this window if except happened
+      logger.info("====Adding tuple: size: {}, data: {}", windowTupleCollector.size(), windowTupleCollector); 
+      int tupleSize = windowTupleCollector.size();
       tupleCollection.addAll(windowTupleCollector);
       windowTupleCollector.clear();
       
       if (latch != null) {
-        while (endTupleCount-- > 0) {
+        while (tupleSize-- > 0) {
           if (latch.getCount() == 0) {
-            logger.warn("Receive extra END_TUPLE; Received tuple size: {}", tupleCollection.size());
+            logger.warn("Receive extra data; Total received tuple size: {}", tupleCollection.size());
           } else {
             latch.countDown();
           }
@@ -257,13 +258,13 @@ public class KafkaInputOperatorTest extends KafkaOperatorTestBase
     
     
     // each broker should get a END_TUPLE message
-    latch = new CountDownLatch(totalBrokers);
+    latch = new CountDownLatch(totalCount);
 
     k = 0;
     tupleCollection.clear();
     
-    logger.info("====Test Case: name: {}; hasFailure: {}; totalBrokers: {}; total tuple size(k): {}; tupleCollection size: {}", 
-        testName, hasFailure, totalBrokers, k, tupleCollection.size()); 
+    logger.info("====Test Case: name: {}; totalBrokers: {}; hasFailure: {}; hasMultiCluster: {}; hasMultiPartition: {}, partition: {}", 
+        testName, totalBrokers, hasFailure, hasMultiCluster, hasMultiPartition, partition); 
 
     // Create DAG for testing.
     LocalMode lma = LocalMode.newInstance();
