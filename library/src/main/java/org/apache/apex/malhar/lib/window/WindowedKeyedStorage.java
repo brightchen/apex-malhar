@@ -31,7 +31,7 @@ import org.apache.hadoop.classification.InterfaceStability;
  *
  */
 @InterfaceStability.Evolving
-public interface WindowedKeyedStorage<K, V> extends WindowedStorage<Map<K, V>>
+public interface WindowedKeyedStorage<K, V, M extends Map<K, V>> extends WindowedStorage<M>
 {
   /**
    * Sets the data associated with the given window and the key
