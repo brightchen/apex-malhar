@@ -19,6 +19,7 @@
 package org.apache.apex.malhar.lib.window.impl;
 
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -37,10 +38,15 @@ import com.datatorrent.lib.util.KeyValPair;
 /**
  * This is an implementation of WindowedOperator that takes in key value pairs as input and gives out key value pairs
  * as output. If your operation is not key based, please use {@link WindowedOperatorImpl}.
+ *
+ * @param <KeyT> The type of the key of both the input and the output tuple
+ * @param <InputValT> The type of the value of the keyed input tuple
+ * @param <AccumT> The type of the accumulated value in the operator state per key per window
+ * @param <OutputValT> The type of the value of the keyed output tuple
  */
 @InterfaceStability.Evolving
 public class KeyedWindowedOperatorImpl<KeyT, InputValT, AccumT, OutputValT>
-    extends AbstractWindowedOperator<KeyValPair<KeyT, InputValT>, KeyValPair<KeyT, OutputValT>, WindowedKeyedStorage<KeyT, AccumT>, Accumulation<InputValT, AccumT, OutputValT>>
+    extends AbstractWindowedOperator<KeyValPair<KeyT, InputValT>, KeyValPair<KeyT, OutputValT>, WindowedKeyedStorage<KeyT, AccumT>, WindowedKeyedStorage<KeyT, OutputValT>, Accumulation<InputValT, AccumT, OutputValT>>
 {
 
   @Override
@@ -49,7 +55,7 @@ public class KeyedWindowedOperatorImpl<KeyT, InputValT, AccumT, OutputValT>
     KeyT key = inputTuple.getValue().getKey();
     WindowOption.SessionWindows sessionWindowOption = (WindowOption.SessionWindows)windowOption;
     SessionWindowedStorage<KeyT, AccumT> sessionStorage = (SessionWindowedStorage<KeyT, AccumT>)dataStorage;
-    Collection<Map.Entry<Window.SessionWindow, AccumT>> sessionEntries = sessionStorage.getSessionEntries(key, timestamp, sessionWindowOption.getMinGap().getMillis());
+    Collection<Map.Entry<Window.SessionWindow<KeyT>, AccumT>> sessionEntries = sessionStorage.getSessionEntries(key, timestamp, sessionWindowOption.getMinGap().getMillis());
     Window.SessionWindow<KeyT> sessionWindowToAssign;
     switch (sessionEntries.size()) {
       case 0: {
@@ -61,14 +67,15 @@ public class KeyedWindowedOperatorImpl<KeyT, InputValT, AccumT, OutputValT>
       }
       case 1: {
         // There is already one existing window within the minimum gap. See whether we need to extend the time of that window
-        Map.Entry<Window.SessionWindow, AccumT> sessionWindowEntry = sessionEntries.iterator().next();
+        Map.Entry<Window.SessionWindow<KeyT>, AccumT> sessionWindowEntry = sessionEntries.iterator().next();
         Window.SessionWindow<KeyT> sessionWindow = sessionWindowEntry.getKey();
         if (sessionWindow.getBeginTimestamp() <= timestamp && timestamp < sessionWindow.getBeginTimestamp() + sessionWindow.getDurationMillis()) {
           // The session window already covers the event
           sessionWindowToAssign = sessionWindow;
         } else {
           // The session window does not cover the event but is within the min gap
-          if (triggerOption.getAccumulationMode() == TriggerOption.AccumulationMode.ACCUMULATING_AND_RETRACTING) {
+          if (triggerOption != null &&
+              triggerOption.getAccumulationMode() == TriggerOption.AccumulationMode.ACCUMULATING_AND_RETRACTING) {
             // fire a retraction trigger because the session window will be enlarged
             fireRetractionTrigger(sessionWindow);
           }
@@ -86,13 +93,15 @@ public class KeyedWindowedOperatorImpl<KeyT, InputValT, AccumT, OutputValT>
       }
       case 2: {
         // There are two windows that fall within the minimum gap of the timestamp. We need to merge the two windows
-        Map.Entry<Window.SessionWindow, AccumT> sessionWindowEntry1 = sessionEntries.iterator().next();
-        Map.Entry<Window.SessionWindow, AccumT> sessionWindowEntry2 = sessionEntries.iterator().next();
+        Iterator<Map.Entry<Window.SessionWindow<KeyT>, AccumT>> iterator = sessionEntries.iterator();
+        Map.Entry<Window.SessionWindow<KeyT>, AccumT> sessionWindowEntry1 = iterator.next();
+        Map.Entry<Window.SessionWindow<KeyT>, AccumT> sessionWindowEntry2 = iterator.next();
         Window.SessionWindow<KeyT> sessionWindow1 = sessionWindowEntry1.getKey();
         Window.SessionWindow<KeyT> sessionWindow2 = sessionWindowEntry2.getKey();
         AccumT sessionData1 = sessionWindowEntry1.getValue();
-        AccumT sessionData2 = sessionWindowEntry1.getValue();
-        if (triggerOption.getAccumulationMode() == TriggerOption.AccumulationMode.ACCUMULATING_AND_RETRACTING) {
+        AccumT sessionData2 = sessionWindowEntry2.getValue();
+        if (triggerOption != null &&
+            triggerOption.getAccumulationMode() == TriggerOption.AccumulationMode.ACCUMULATING_AND_RETRACTING) {
           // fire a retraction trigger because the two session windows will be merged to a new window
           fireRetractionTrigger(sessionWindow1);
           fireRetractionTrigger(sessionWindow2);
@@ -106,6 +115,9 @@ public class KeyedWindowedOperatorImpl<KeyT, InputValT, AccumT, OutputValT>
         sessionStorage.remove(sessionWindow1);
         sessionStorage.remove(sessionWindow2);
         sessionStorage.put(newSessionWindow, key, newSessionData);
+        windowStateMap.remove(sessionWindow1);
+        windowStateMap.remove(sessionWindow2);
+        windowStateMap.put(newSessionWindow, new WindowState());
         sessionWindowToAssign = newSessionWindow;
         break;
       }
@@ -134,15 +146,16 @@ public class KeyedWindowedOperatorImpl<KeyT, InputValT, AccumT, OutputValT>
   public void fireNormalTrigger(Window window, boolean fireOnlyUpdatedPanes)
   {
     for (Map.Entry<KeyT, AccumT> entry : dataStorage.entrySet(window)) {
+      OutputValT outputVal = accumulation.getOutput(entry.getValue());
       if (fireOnlyUpdatedPanes) {
-        AccumT oldAccumulatedValue = retractionStorage.get(window, entry.getKey());
-        if (oldAccumulatedValue != null && oldAccumulatedValue.equals(entry.getValue())) {
+        OutputValT oldValue = retractionStorage.get(window, entry.getKey());
+        if (oldValue != null && oldValue.equals(outputVal)) {
           continue;
         }
       }
-      output.emit(new Tuple.WindowedTuple<>(window, new KeyValPair<>(entry.getKey(), accumulation.getOutput(entry.getValue()))));
+      output.emit(new Tuple.WindowedTuple<>(window, new KeyValPair<>(entry.getKey(), outputVal)));
       if (retractionStorage != null) {
-        retractionStorage.put(window, entry.getKey(), entry.getValue());
+        retractionStorage.put(window, entry.getKey(), outputVal);
       }
     }
   }
@@ -153,7 +166,7 @@ public class KeyedWindowedOperatorImpl<KeyT, InputValT, AccumT, OutputValT>
     if (triggerOption.getAccumulationMode() != TriggerOption.AccumulationMode.ACCUMULATING_AND_RETRACTING) {
       throw new UnsupportedOperationException();
     }
-    for (Map.Entry<KeyT, AccumT> entry : retractionStorage.entrySet(window)) {
+    for (Map.Entry<KeyT, OutputValT> entry : retractionStorage.entrySet(window)) {
       output.emit(new Tuple.WindowedTuple<>(window, new KeyValPair<>(entry.getKey(), accumulation.getRetraction(entry.getValue()))));
     }
   }

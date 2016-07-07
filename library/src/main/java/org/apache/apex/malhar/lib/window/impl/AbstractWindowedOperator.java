@@ -53,9 +53,13 @@ import com.datatorrent.common.util.BaseOperator;
  * concepts. The subclass of this abstract class is supposed to provide the implementation of how the accumulated
  * values are stored in the storage.
  *
+ * @param <InputT> The type of the input tuple
+ * @param <OutputT> The type of the output tuple
+ * @param <DataStorageT> The type of the data storage
+ * @param <AccumulationT> The type of the accumulation
  */
 @InterfaceStability.Evolving
-public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT extends WindowedStorage, AccumulationT extends Accumulation>
+public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT extends WindowedStorage, RetractionStorageT extends WindowedStorage, AccumulationT extends Accumulation>
     extends BaseOperator implements WindowedOperator<InputT>
 {
 
@@ -66,7 +70,8 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
 
   private Function<InputT, Long> timestampExtractor;
 
-  private long currentWatermark;
+  private long currentWatermark = -1;
+  private long watermarkTimestamp = -1;
   private boolean triggerAtWatermark;
   private long earlyTriggerCount;
   private long earlyTriggerMillis;
@@ -75,7 +80,7 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
   private long currentDerivedTimestamp = -1;
   private long windowWidthMillis;
   protected DataStorageT dataStorage;
-  protected DataStorageT retractionStorage;
+  protected RetractionStorageT retractionStorage;
   protected AccumulationT accumulation;
 
   private static final transient Logger LOG = LoggerFactory.getLogger(AbstractWindowedOperator.class);
@@ -101,7 +106,6 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
       }
     }
   };
-
 
   // TODO: multiple input ports for join operations
 
@@ -158,7 +162,7 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
   {
     this.triggerOption = triggerOption;
     for (TriggerOption.Trigger trigger : triggerOption.getTriggerList()) {
-      switch (trigger.getWatermarkOpt()) {
+      switch (trigger.getType()) {
         case ON_TIME:
           triggerAtWatermark = true;
           break;
@@ -177,7 +181,7 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
           }
           break;
         default:
-          throw new RuntimeException("Unexpected watermark option: " + trigger.getWatermarkOpt());
+          throw new RuntimeException("Unknown trigger type: " + trigger.getType());
       }
     }
   }
@@ -203,7 +207,7 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
    *
    * @param storageAgent
    */
-  public void setRetractionStorage(DataStorageT storageAgent)
+  public void setRetractionStorage(RetractionStorageT storageAgent)
   {
     this.retractionStorage = storageAgent;
   }
@@ -327,12 +331,12 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
         // Note: this messes up the order of the window and we might want to revisit this if the order of the windows
         // matter
         for (long slideBeginTimestamp = beginTimestamp - slideBy;
-            slideBeginTimestamp >= timestamp && timestamp > slideBeginTimestamp + durationMillis;
+            slideBeginTimestamp <= timestamp && timestamp < slideBeginTimestamp + durationMillis;
             slideBeginTimestamp -= slideBy) {
           windows.add(new Window.TimeWindow(slideBeginTimestamp, durationMillis));
         }
         for (long slideBeginTimestamp = beginTimestamp + slideBy;
-            slideBeginTimestamp >= timestamp && timestamp > slideBeginTimestamp + durationMillis;
+            slideBeginTimestamp <= timestamp && timestamp < slideBeginTimestamp + durationMillis;
             slideBeginTimestamp += slideBy) {
           windows.add(new Window.TimeWindow(slideBeginTimestamp, durationMillis));
         }
@@ -356,36 +360,10 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
     LOG.debug("Dropping late tuple {}", input);
   }
 
-
   @Override
   public void processWatermark(ControlTuple.Watermark watermark)
   {
-    currentWatermark = watermark.getTimestamp();
-    long horizon = currentWatermark - allowedLatenessMillis;
-    if (allowedLatenessMillis >= 0) {
-      // purge window that are too late to accept any more input
-      dataStorage.removeUpTo(horizon);
-    }
-
-    for (Iterator<Map.Entry<Window, WindowState>> it = windowStateMap.iterator(); it.hasNext(); ) {
-      Map.Entry<Window, WindowState> entry = it.next();
-      Window window = entry.getKey();
-      WindowState windowState = entry.getValue();
-      if (allowedLatenessMillis >= 0 && window.getBeginTimestamp() + window.getDurationMillis() < horizon) {
-        // discard this window because it's too late now
-        it.remove();
-      } else if (window.getBeginTimestamp() + window.getDurationMillis() < currentWatermark) {
-        // watermark has not arrived for this window before, marking this window late
-        if (windowState.watermarkArrivalTime == -1) {
-          windowState.watermarkArrivalTime = currentDerivedTimestamp;
-          if (triggerAtWatermark) {
-            // fire trigger at watermark if applicable
-            fireTrigger(window, windowState);
-          }
-        }
-      }
-    }
-    controlOutput.emit(watermark);
+    this.watermarkTimestamp = watermark.getTimestamp();
   }
 
   @Override
@@ -406,6 +384,7 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
     } else {
       currentDerivedTimestamp += windowWidthMillis;
     }
+    watermarkTimestamp = -1;
   }
 
   /**
@@ -414,7 +393,42 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
   @Override
   public void endWindow()
   {
+    // We only do actual processing of watermark at window boundary so that it will not break idempotency.
+    // TODO: May want to revisit this if the application cares more about latency than idempotency
+    processWatermarkAtEndWindow();
     fireTimeTriggers();
+  }
+
+  private void processWatermarkAtEndWindow()
+  {
+    if (watermarkTimestamp > 0) {
+      this.currentWatermark = watermarkTimestamp;
+
+      long horizon = watermarkTimestamp - allowedLatenessMillis;
+
+      for (Iterator<Map.Entry<Window, WindowState>> it = windowStateMap.iterator(); it.hasNext(); ) {
+        Map.Entry<Window, WindowState> entry = it.next();
+        Window window = entry.getKey();
+        WindowState windowState = entry.getValue();
+        if (window.getBeginTimestamp() + window.getDurationMillis() < watermarkTimestamp) {
+          // watermark has not arrived for this window before, marking this window late
+          if (windowState.watermarkArrivalTime == -1) {
+            windowState.watermarkArrivalTime = currentDerivedTimestamp;
+            if (triggerAtWatermark) {
+              // fire trigger at watermark if applicable
+              fireTrigger(window, windowState);
+            }
+          }
+          if (allowedLatenessMillis >= 0 && window.getBeginTimestamp() + window.getDurationMillis() < horizon) {
+            // discard this window because it's too late now
+            it.remove();
+            dataStorage.remove(window);
+            retractionStorage.remove(window);
+          }
+        }
+      }
+      controlOutput.emit(new WatermarkImpl(watermarkTimestamp));
+    }
   }
 
   private void fireTimeTriggers()
@@ -474,13 +488,4 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
     dataStorage.remove(window);
   }
 
-  @Override
-  public void invalidateWindow(Window window)
-  {
-    dataStorage.remove(window);
-    if (retractionStorage != null) {
-      retractionStorage.remove(window);
-    }
-    windowStateMap.remove(window);
-  }
 }

@@ -27,10 +27,14 @@ import org.apache.hadoop.classification.InterfaceStability;
 
 /**
  * This is an implementation of the WindowedOperator. If your operation is key based, please use {@link KeyedWindowedOperatorImpl}.
+ *
+ * @param <InputT> The type of the value of the input tuple
+ * @param <AccumT> The type of the accumulated value in the operator state per window
+ * @param <OutputT> The type of the value of the output tuple
  */
 @InterfaceStability.Evolving
 public class WindowedOperatorImpl<InputT, AccumT, OutputT>
-    extends AbstractWindowedOperator<InputT, OutputT, WindowedStorage<AccumT>, Accumulation<InputT, AccumT, OutputT>>
+    extends AbstractWindowedOperator<InputT, OutputT, WindowedStorage<AccumT>, WindowedStorage<OutputT>, Accumulation<InputT, AccumT, OutputT>>
 {
   @Override
   public void accumulateTuple(Tuple.WindowedTuple<InputT> tuple)
@@ -49,15 +53,16 @@ public class WindowedOperatorImpl<InputT, AccumT, OutputT>
   public void fireNormalTrigger(Window window, boolean fireOnlyUpdatedPanes)
   {
     AccumT accumulatedValue = dataStorage.get(window);
+    OutputT outputValue = accumulation.getOutput(accumulatedValue);
     if (fireOnlyUpdatedPanes) {
-      AccumT oldAccumulatedValue = retractionStorage.get(window);
-      if (oldAccumulatedValue != null && oldAccumulatedValue.equals(accumulatedValue)) {
+      OutputT oldValue = retractionStorage.get(window);
+      if (oldValue != null && oldValue.equals(outputValue)) {
         return;
       }
     }
-    output.emit(new Tuple.WindowedTuple<>(window, accumulation.getOutput(accumulatedValue)));
+    output.emit(new Tuple.WindowedTuple<>(window, outputValue));
     if (retractionStorage != null) {
-      retractionStorage.put(window, accumulatedValue);
+      retractionStorage.put(window, outputValue);
     }
   }
 
@@ -67,7 +72,9 @@ public class WindowedOperatorImpl<InputT, AccumT, OutputT>
     if (triggerOption.getAccumulationMode() != TriggerOption.AccumulationMode.ACCUMULATING_AND_RETRACTING) {
       throw new UnsupportedOperationException();
     }
-    AccumT accumulatedValue = retractionStorage.get(window);
-    output.emit(new Tuple.WindowedTuple<>(window, accumulation.getRetraction(accumulatedValue)));
+    OutputT oldValue = retractionStorage.get(window);
+    if (oldValue != null) {
+      output.emit(new Tuple.WindowedTuple<>(window, accumulation.getRetraction(oldValue)));
+    }
   }
 }

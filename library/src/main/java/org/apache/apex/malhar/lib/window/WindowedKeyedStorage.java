@@ -19,7 +19,6 @@
 package org.apache.apex.malhar.lib.window;
 
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.hadoop.classification.InterfaceStability;
 
@@ -51,14 +50,6 @@ public interface WindowedKeyedStorage<K, V, M extends Map<K, V>> extends Windowe
   Iterable<Map.Entry<K, V>> entrySet(Window window);
 
   /**
-   * Gets the windows in the storage that end before the given timestamp
-   *
-   * @param timestamp
-   * @return
-   */
-  Set<Window> windowsEndBefore(long timestamp);
-
-  /**
    * Gets the data associated with the given window and the key
    *
    * @param window
@@ -73,14 +64,6 @@ public interface WindowedKeyedStorage<K, V, M extends Map<K, V>> extends Windowe
    * @param window
    */
   void remove(Window window);
-
-  /**
-   * Removes all data in this storage that is associated with a window at or before the specified timestamp.
-   * This will be used for purging data beyond the allowed lateness
-   *
-   * @param timestamp
-   */
-  void removeUpTo(long timestamp);
 
   /**
    * Migrate the data from one window to another. This will invalidate fromWindow in the storage and move the

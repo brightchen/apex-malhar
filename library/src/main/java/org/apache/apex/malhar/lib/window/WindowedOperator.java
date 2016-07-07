@@ -27,6 +27,11 @@ import com.google.common.base.Function;
 /**
  * This interface describes what needs to be implemented for the operator that supports the Apache Beam model of
  * windowing and triggering
+ *
+ * TODO: We may not need this interface at all since there are no components that make use of these methods generically.
+ * TODO: We may wanna just use the abstract class {@link org.apache.apex.malhar.lib.window.impl.AbstractWindowedOperator}
+ *
+ * @param <InputT> The type of the input tuple
  */
 @InterfaceStability.Evolving
 public interface WindowedOperator<InputT>
@@ -124,15 +129,5 @@ public interface WindowedOperator<InputT>
    * @param window
    */
   void clearWindowData(Window window);
-
-  /**
-   * This method invalidates the given window. The scenarios of calling this method are:
-   *  1. The window has passed the allowed lateness
-   *  2. The window has been merged with another window to form a new window
-   *
-   * @param window
-   */
-  void invalidateWindow(Window window);
-
 
 }
