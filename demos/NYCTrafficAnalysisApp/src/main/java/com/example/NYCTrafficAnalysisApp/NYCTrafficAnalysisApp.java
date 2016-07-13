@@ -29,7 +29,7 @@ public class NYCTrafficAnalysisApp implements StreamingApplication
       CsvParser parser = dag.addOperator("Parser", CsvParser.class);
       ConsoleOutputOperator consoleOutput = dag.addOperator("Console", ConsoleOutputOperator.class);
 
-      reader.setDirectory("/user/aayushi");
+      reader.setDirectory("/user/aayushi/testfiles");
       parser.setSchema(mySchema);
 
       dag.setOutputPortAttribute(parser.out, Context.PortContext.TUPLE_CLASS, POJOobject.class);
