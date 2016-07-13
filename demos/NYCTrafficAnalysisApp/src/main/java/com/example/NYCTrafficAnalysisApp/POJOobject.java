@@ -6,13 +6,13 @@ package com.example.NYCTrafficAnalysisApp;
 public class POJOobject {
 
     private String pickup;
-    //private String dropoff;
+    private String dropoff;
     private int fare;
 
     @Override
     public String toString()
     {
-        return "POJOobject [pickup=" + pickup + /*", dropoff=" + dropoff +*/ ", fare=" + fare + "]";
+        return "POJOobject [pickup=" + pickup + ", dropoff=" + dropoff + ", fare=" + fare + "]";
     }
 
     public String getPickup()
@@ -24,16 +24,16 @@ public class POJOobject {
     {
         this.pickup = pickup;
     }
-//
-//    public String getDropoff()
-//    {
-//        return dropoff;
-//    }
-//
-//    public void setDropoff(String dropoff)
-//    {
-//        this.dropoff = dropoff;
-//    }
+
+    public String getDropoff()
+    {
+        return dropoff;
+    }
+
+    public void setDropoff(String dropoff)
+    {
+        this.dropoff = dropoff;
+    }
 
     public int getFare()
     {
