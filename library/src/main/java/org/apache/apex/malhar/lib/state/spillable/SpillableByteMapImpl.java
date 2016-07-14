@@ -42,6 +42,9 @@ public class SpillableByteMapImpl<K, V> implements Spillable.SpillableByteMap<K,
   public SpillableByteMapImpl(SpillableStateStore store, byte[] identifier, long bucket, Serde<K, Slice> serdeKey,
       Serde<V, Slice> serdeValue)
   {
+    if (bucket < 0) {
+      throw new IllegalArgumentException("bucket id should not negative");
+    }
     this.store = Preconditions.checkNotNull(store);
     this.identifier = Preconditions.checkNotNull(identifier);
     this.bucket = bucket;
@@ -161,6 +164,7 @@ public class SpillableByteMapImpl<K, V> implements Spillable.SpillableByteMap<K,
   @Override
   public void setup(Context.OperatorContext context)
   {
+    store.setup(context);
   }
 
   @Override

@@ -254,6 +254,7 @@ public abstract class AbstractManagedStateImpl
    */
   protected int prepareBucket(long bucketId)
   {
+    try {
     stateTracker.bucketAccessed(bucketId);
     int bucketIdx = getBucketIdx(bucketId);
 
@@ -267,6 +268,10 @@ public abstract class AbstractManagedStateImpl
       handleBucketConflict(bucketIdx, bucketId);
     }
     return bucketIdx;
+    } catch(Exception e) {
+      e.printStackTrace();
+      return 0;
+    }
   }
 
   protected void putInBucket(long bucketId, long timeBucket, @NotNull Slice key, @NotNull Slice value)
@@ -580,6 +585,18 @@ public abstract class AbstractManagedStateImpl
   {
     this.bucketsFileSystem = Preconditions.checkNotNull(bucketsFileSystem, "buckets file system");
   }
+
+  
+  public IncrementalCheckpointManager getCheckpointManager()
+  {
+    return checkpointManager;
+  }
+
+  public void setCheckpointManager(IncrementalCheckpointManager checkpointManager)
+  {
+    this.checkpointManager = checkpointManager;
+  }
+
 
   private static final transient Logger LOG = LoggerFactory.getLogger(AbstractManagedStateImpl.class);
 }

@@ -110,7 +110,7 @@ public class ManagedStateTestUtils
     return new OperatorContextTestHelper.TestIdOperatorContext(operatorId, attributes);
   }
 
-  static Context.OperatorContext getOperatorContext(int operatorId)
+  public static Context.OperatorContext getOperatorContext(int operatorId)
   {
     Attribute.AttributeMap.DefaultAttributeMap attributes = new Attribute.AttributeMap.DefaultAttributeMap();
     return new OperatorContextTestHelper.TestIdOperatorContext(operatorId, attributes);

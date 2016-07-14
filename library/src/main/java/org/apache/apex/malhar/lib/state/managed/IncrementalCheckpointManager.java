@@ -63,7 +63,7 @@ public class IncrementalCheckpointManager extends FSWindowDataManager
   private transient ExecutorService writerService;
   private transient volatile boolean transfer;
 
-  private final transient LinkedBlockingQueue<Long> windowsToTransfer = Queues.newLinkedBlockingQueue();
+  protected final transient LinkedBlockingQueue<Long> windowsToTransfer = Queues.newLinkedBlockingQueue();
   private final transient AtomicReference<Throwable> throwable = new AtomicReference<>();
 
   protected transient ManagedStateContext managedStateContext;
@@ -74,6 +74,11 @@ public class IncrementalCheckpointManager extends FSWindowDataManager
   private volatile long lastTransferredWindow = Stateless.WINDOW_ID;
 
   private transient long largestWindowAddedToTransferQueue = Stateless.WINDOW_ID;
+  
+  /**
+   * in some case, we don't need bucket file at all.
+   */
+  protected boolean needBucketFile = true;
 
   public IncrementalCheckpointManager()
   {
@@ -125,12 +130,14 @@ public class IncrementalCheckpointManager extends FSWindowDataManager
       if (windowId != null) {
         try {
           LOG.debug("transfer window {}", windowId);
-          //bucket id => bucket data(key => value, time-buckets)
-          Map<Long, Map<Slice, Bucket.BucketedValue>> buckets = savedWindows.remove(windowId);
-
-          for (Map.Entry<Long, Map<Slice, Bucket.BucketedValue>> singleBucket : buckets.entrySet()) {
-            managedStateContext.getBucketsFileSystem().writeBucketData(windowId, singleBucket.getKey(),
-                singleBucket.getValue());
+          if(needBucketFile) {
+            //bucket id => bucket data(key => value, time-buckets)
+            Map<Long, Map<Slice, Bucket.BucketedValue>> buckets = savedWindows.remove(windowId);
+            
+            for (Map.Entry<Long, Map<Slice, Bucket.BucketedValue>> singleBucket : buckets.entrySet()) {
+              managedStateContext.getBucketsFileSystem().writeBucketData(windowId, singleBucket.getKey(),
+                  singleBucket.getValue());
+            }
           }
           storageAgent.delete(managedStateContext.getOperatorContext().getId(), windowId);
         } catch (Throwable t) {
@@ -226,6 +233,18 @@ public class IncrementalCheckpointManager extends FSWindowDataManager
   {
     return lastTransferredWindow;
   }
+
+  
+  public boolean isNeedBucketFile()
+  {
+    return needBucketFile;
+  }
+
+  public void setNeedBucketFile(boolean needBucketFile)
+  {
+    this.needBucketFile = needBucketFile;
+  }
+
 
   private static final Logger LOG = LoggerFactory.getLogger(IncrementalCheckpointManager.class);
 

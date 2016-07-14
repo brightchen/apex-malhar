@@ -22,6 +22,8 @@ import java.util.Map;
 
 import org.apache.hadoop.classification.InterfaceStability;
 
+import com.datatorrent.api.Context.OperatorContext;
+
 /**
  * WindowedStorage is a key-value store with the key being the window. The implementation of this interface should
  * make sure checkpointing and recovery will be done correctly.
@@ -85,4 +87,17 @@ public interface WindowedStorage<T> extends Iterable<Map.Entry<Window, T>>
    * @return
    */
   Iterable<Map.Entry<Window, T>> entrySet();
+  
+  /**
+   * methods required for stream window management
+   */
+  void setup(OperatorContext context);
+  
+  void beginWindow(long windowId);
+  
+  void endWindow();
+  
+  void beforeCheckpoint(long windowId);
+  
+  void committed(long windowId);
 }
