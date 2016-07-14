@@ -28,14 +28,14 @@ import org.apache.apex.malhar.lib.window.WindowedStorage;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * This is the in-memory implementation of {@link WindowedStorage}. Do not use this class if you have a large state that
+ * This is the in-memory implementation of {@link WindowedPlainStorage}. Do not use this class if you have a large state that
  * can't be fit in memory. Also, this class may go away soon as there are plans to incorporate {@link Spillable} data
  * structures in the near future.
  */
 @InterfaceStability.Unstable
-public class InMemoryWindowedStorage<T> implements WindowedStorage<T>
+public class InMemoryWindowedStorage<T> implements WindowedStorage.WindowedPlainStorage<T>
 {
-  protected final TreeMap<Window, T> map = new TreeMap<>(Window.DEFAULT_COMPARATOR);
+  protected final TreeMap<Window, T> map = new TreeMap<>();
 
   @Override
   public long size()
@@ -85,5 +85,30 @@ public class InMemoryWindowedStorage<T> implements WindowedStorage<T>
   public Iterator<Map.Entry<Window, T>> iterator()
   {
     return map.entrySet().iterator();
+  }
+
+  @Override
+  public void beginApexWindow(long windowId)
+  {
+  }
+
+  @Override
+  public void endApexWindow()
+  {
+  }
+
+  @Override
+  public void beforeCheckpoint(long windowId)
+  {
+  }
+
+  @Override
+  public void checkpointed(long windowId)
+  {
+  }
+
+  @Override
+  public void committed(long windowId)
+  {
   }
 }
