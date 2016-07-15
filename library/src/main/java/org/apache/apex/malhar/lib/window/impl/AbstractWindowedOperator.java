@@ -21,7 +21,6 @@ package org.apache.apex.malhar.lib.window.impl;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -44,7 +43,6 @@ import org.apache.apex.malhar.lib.window.WindowedStorage;
 import org.apache.hadoop.classification.InterfaceStability;
 
 import com.google.common.base.Function;
-import com.sun.java.swing.plaf.windows.resources.windows;
 
 import com.datatorrent.api.Context;
 import com.datatorrent.api.DefaultInputPort;
