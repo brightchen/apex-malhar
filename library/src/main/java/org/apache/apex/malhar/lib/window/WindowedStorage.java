@@ -20,6 +20,7 @@ package org.apache.apex.malhar.lib.window;
 
 import java.util.Map;
 
+import org.apache.apex.malhar.lib.state.spillable.Spillable;
 import org.apache.hadoop.classification.InterfaceStability;
 
 import com.datatorrent.api.Context.OperatorContext;
@@ -27,6 +28,16 @@ import com.datatorrent.api.Context.OperatorContext;
 /**
  * WindowedStorage is a key-value store with the key being the window. The implementation of this interface should
  * make sure checkpointing and recovery will be done correctly.
+=======
+import org.apache.apex.malhar.lib.state.spillable.Spillable;
+import org.apache.hadoop.classification.InterfaceStability;
+
+/**
+ * WindowedStorage is a key-value store with the key being the window. The implementation of this interface should
+ * make sure checkpointing and recovery will be done correctly.
+ * Note that this interface may go away soon as there are plans to incorporate {@link Spillable} data structures in the
+ * near future.
+>>>>>>> 0b66f19d14a518b83059c74573dc7fdd58693788
  *
  * @param <T> The type of the data that is stored per window
  *
@@ -100,4 +111,5 @@ public interface WindowedStorage<T> extends Iterable<Map.Entry<Window, T>>
   void beforeCheckpoint(long windowId);
   
   void committed(long windowId);
+
 }

@@ -27,16 +27,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.apex.malhar.lib.state.spillable.Spillable;
 import org.apache.apex.malhar.lib.window.SessionWindowedStorage;
 import org.apache.apex.malhar.lib.window.Window;
 import org.apache.apex.malhar.lib.window.WindowedKeyedStorage;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * This is the in-memory implementation of WindowedKeyedStorage. Do not use this class if you have a large state that
- * can't be fit in memory.
+ * This is the in-memory implementation of {@link WindowedKeyedStorage}. Do not use this class if you have a large state that
+ * can't be fit in memory. Also, this class may go away soon as there are plans to incorporate {@link Spillable} data structures
+ * in the near future.
  */
-@InterfaceStability.Evolving
+@InterfaceStability.Unstable
 public class InMemoryWindowedKeyedStorage<K, V> extends InMemoryWindowedStorage<Map<K, V>>
     implements WindowedKeyedStorage<K, V>, SessionWindowedStorage<K, V>
 {

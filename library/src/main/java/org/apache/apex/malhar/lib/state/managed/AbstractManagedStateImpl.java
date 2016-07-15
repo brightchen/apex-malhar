@@ -144,7 +144,7 @@ public abstract class AbstractManagedStateImpl
   protected transient ExecutorService readerService;
 
   @NotNull
-  protected IncrementalCheckpointManager checkpointManager = new IncrementalCheckpointManager();
+  private IncrementalCheckpointManager checkpointManager = new IncrementalCheckpointManager();
 
   @NotNull
   protected BucketsFileSystem bucketsFileSystem = new BucketsFileSystem();
@@ -203,22 +203,24 @@ public abstract class AbstractManagedStateImpl
       //delete all the wal files with windows > activationWindow.
       //All the wal files with windows <= activationWindow are loaded and kept separately as recovered data.
       try {
-        for (long recoveredWindow : checkpointManager.getWindowIds(operatorContext.getId())) {
-          if (recoveredWindow <= activationWindow) {
-            @SuppressWarnings("unchecked")
-            Map<Long, Map<Slice, Bucket.BucketedValue>> recoveredData = (Map<Long, Map<Slice, Bucket.BucketedValue>>)
-                checkpointManager.load(operatorContext.getId(), recoveredWindow);
-            if (recoveredData != null && !recoveredData.isEmpty()) {
-              for (Map.Entry<Long, Map<Slice, Bucket.BucketedValue>> entry : recoveredData.entrySet()) {
-                int bucketIdx = prepareBucket(entry.getKey());
-                buckets[bucketIdx].recoveredData(recoveredWindow, entry.getValue());
+        long[] recoveredWindows = checkpointManager.getWindowIds(operatorContext.getId());
+        if (recoveredWindows != null) {
+          for (long recoveredWindow : recoveredWindows) {
+            if (recoveredWindow <= activationWindow) {
+              @SuppressWarnings("unchecked")
+              Map<Long, Map<Slice, Bucket.BucketedValue>> recoveredData = (Map<Long, Map<Slice, Bucket.BucketedValue>>)
+                  checkpointManager.load(operatorContext.getId(), recoveredWindow);
+              if (recoveredData != null && !recoveredData.isEmpty()) {
+                for (Map.Entry<Long, Map<Slice, Bucket.BucketedValue>> entry : recoveredData.entrySet()) {
+                  int bucketIdx = prepareBucket(entry.getKey());
+                  buckets[bucketIdx].recoveredData(recoveredWindow, entry.getValue());
+                }
               }
+              checkpointManager.save(recoveredData, operatorContext.getId(), recoveredWindow,
+                  true /*skipWritingToWindowFile*/);
+            } else {
+              checkpointManager.delete(operatorContext.getId(), recoveredWindow);
             }
-            checkpointManager.save(recoveredData, operatorContext.getId(), recoveredWindow,
-                true /*skipWritingToWindowFile*/);
-
-          } else {
-            checkpointManager.delete(operatorContext.getId(), recoveredWindow);
           }
         }
       } catch (IOException e) {
@@ -541,6 +543,16 @@ public abstract class AbstractManagedStateImpl
     this.durationPreventingFreeingSpace = durationPreventingFreeingSpace;
   }
 
+  public IncrementalCheckpointManager getCheckpointManager()
+  {
+    return checkpointManager;
+  }
+
+  public void setCheckpointManager(@NotNull IncrementalCheckpointManager checkpointManager)
+  {
+    this.checkpointManager = Preconditions.checkNotNull(checkpointManager);
+  }
+
   static class ValueFetchTask implements Callable<Slice>
   {
     private final Bucket bucket;
@@ -585,18 +597,6 @@ public abstract class AbstractManagedStateImpl
   {
     this.bucketsFileSystem = Preconditions.checkNotNull(bucketsFileSystem, "buckets file system");
   }
-
-  
-  public IncrementalCheckpointManager getCheckpointManager()
-  {
-    return checkpointManager;
-  }
-
-  public void setCheckpointManager(IncrementalCheckpointManager checkpointManager)
-  {
-    this.checkpointManager = checkpointManager;
-  }
-
 
   private static final transient Logger LOG = LoggerFactory.getLogger(AbstractManagedStateImpl.class);
 }

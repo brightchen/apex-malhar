@@ -16,21 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.datatorrent.contrib.hbase;
+package com.datatorrent.lib.bandwidth;
 
-import com.datatorrent.api.InputOperator;
-import com.datatorrent.lib.db.AbstractStoreInputOperator;
+import com.datatorrent.api.Operator;
 
 /**
- * A base implementation of hbase input operator which derives from HBaseOperatorBase. <br>
- * <p>
- * <br>
- * @displayName HBase Input
- * @category Input
- * @tags hbase
- * @param <T> The tuple type
- * @since 0.3.2
+ * Operator which limits bandwidth consumption. It should have instance of BandwidthManager.
  */
-public abstract class HBaseInputOperator<T> extends AbstractStoreInputOperator<T, HBaseStore> implements InputOperator
+public interface BandwidthLimitingOperator extends Operator
 {
+  BandwidthManager getBandwidthManager();
 }

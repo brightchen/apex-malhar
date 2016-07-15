@@ -22,15 +22,17 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
 
+import org.apache.apex.malhar.lib.state.spillable.Spillable;
 import org.apache.apex.malhar.lib.window.Window;
 import org.apache.apex.malhar.lib.window.WindowedStorage;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * This is the in-memory implementation of WindowedStorage. Do not use this class if you have a large state that
- * can't be fit in memory.
+ * This is the in-memory implementation of {@link WindowedStorage}. Do not use this class if you have a large state that
+ * can't be fit in memory. Also, this class may go away soon as there are plans to incorporate {@link Spillable} data
+ * structures in the near future.
  */
-@InterfaceStability.Evolving
+@InterfaceStability.Unstable
 public class InMemoryWindowedStorage<T> implements WindowedStorage<T>
 {
   protected final TreeMap<Window, T> map = new TreeMap<>(Window.DEFAULT_COMPARATOR);
