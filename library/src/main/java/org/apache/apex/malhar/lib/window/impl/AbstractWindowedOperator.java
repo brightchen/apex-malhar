@@ -401,8 +401,9 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
   {
     windowStateMap.beginApexWindow(windowId);
     dataStorage.beginApexWindow(windowId);
-    retractionStorage.beginApexWindow(windowId);
-
+    if (retractionStorage != null) {
+      retractionStorage.beginApexWindow(windowId);
+    }
     if (currentDerivedTimestamp == -1) {
       // TODO: once we are able to get the firstWindowMillis from Apex Core API, we can use that instead
       currentDerivedTimestamp = ((windowId >> 32) * 1000) + (windowId & 0xffffffffL);
@@ -425,7 +426,9 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
 
     windowStateMap.endApexWindow();
     dataStorage.endApexWindow();
-    retractionStorage.endApexWindow();
+    if (retractionStorage != null) {
+      retractionStorage.endApexWindow();
+    }
   }
 
   private void processWatermarkAtEndWindow()
@@ -455,7 +458,9 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
             // discard this window because it's too late now
             it.remove();
             dataStorage.remove(window);
-            retractionStorage.remove(window);
+            if (retractionStorage != null) {
+              retractionStorage.remove(window);
+            }
           }
         }
       }
