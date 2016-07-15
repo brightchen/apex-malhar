@@ -1,0 +1,11 @@
+{"keys":[{"name":"Pickup","type":"string"},
+  {"name":"Cartype","type":"string"}],
+  "timeBuckets":["1m","1h","1d"],
+  "values":
+  [{"name":"Fare","type":"long","aggregators":["SUM","MAX","MIN"]}],
+  "dimensions":
+  [{"combination":[]},
+    {"combination":["Pickup"]},
+    {"combination":["Cartype"]},
+    {"combination":["Pickup","Cartype"]}]
+}

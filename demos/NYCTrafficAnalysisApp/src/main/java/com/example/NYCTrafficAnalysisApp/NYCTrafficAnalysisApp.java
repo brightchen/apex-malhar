@@ -11,8 +11,6 @@ import com.datatorrent.api.DAG;
 import com.datatorrent.lib.appdata.schemas.SchemaUtils;
 import com.datatorrent.api.Context;
 
-import com.datatorrent.api.DAG.Locality;
-
 import com.datatorrent.lib.io.ConsoleOutputOperator;
 
 
@@ -23,14 +21,17 @@ public class NYCTrafficAnalysisApp implements StreamingApplication
   @Override
   public void populateDAG(DAG dag, Configuration conf)
   {
-      String mySchema = SchemaUtils.jarResourceFileToString("schema.json");
+      String csvSchema = SchemaUtils.jarResourceFileToString("csvSchema.json");
+      //String dcSchema = SchemaUtils.jarResourceFileToString("dcSchema.json");
 
-      FileReader reader = dag.addOperator("Reader",  FileReader.class);
+      LineByLineFileInputOperator reader = dag.addOperator("Reader",  LineByLineFileInputOperator.class);
       CsvParser parser = dag.addOperator("Parser", CsvParser.class);
       ConsoleOutputOperator consoleOutput = dag.addOperator("Console", ConsoleOutputOperator.class);
+      //DimensionsComputationFlexibleSingleSchemaPOJO dimensions = dag.addOperator("DimensionsComputation", DimensionsComputationFlexibleSingleSchemaPOJO.class);
 
       reader.setDirectory("/user/aayushi/testfiles");
-      parser.setSchema(mySchema);
+      parser.setSchema(csvSchema);
+      //dimensions.setSchema(dcSchema);
 
       dag.setOutputPortAttribute(parser.out, Context.PortContext.TUPLE_CLASS, POJOobject.class);
       dag.setInputPortAttribute(consoleOutput.input, Context.PortContext.TUPLE_CLASS, POJOobject.class);

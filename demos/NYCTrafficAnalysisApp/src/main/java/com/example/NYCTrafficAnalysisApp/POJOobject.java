@@ -7,12 +7,13 @@ public class POJOobject {
 
     private String pickup;
     private String dropoff;
+    private String cartype;
     private int fare;
 
     @Override
     public String toString()
     {
-        return "POJOobject [pickup=" + pickup + /*", dropoff=" + dropoff + */", fare=" + fare + "]";
+        return "POJOobject [pickup=" + pickup + /*", dropoff=" + dropoff + */ ", cartype=" + cartype + ", fare=" + fare + "]";
     }
 
     public String getPickup()
@@ -33,6 +34,16 @@ public class POJOobject {
     public void setDropoff(String dropoff)
     {
         this.dropoff = dropoff;
+    }
+
+    public String getCartype()
+    {
+        return cartype;
+    }
+
+    public void setCartype(String cartype)
+    {
+        this.cartype = cartype;
     }
 
     public int getFare()
