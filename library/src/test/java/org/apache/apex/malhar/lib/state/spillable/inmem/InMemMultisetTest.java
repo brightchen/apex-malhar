@@ -16,12 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.apex.malhar.lib.state.managed.spillable.inmem;
+package org.apache.apex.malhar.lib.state.spillable.inmem;
 
 import org.junit.Assert;
 import org.junit.Test;
-
-import org.apache.apex.malhar.lib.state.spillable.inmem.InMemMultiset;
 
 import com.esotericsoftware.kryo.Kryo;
 
