@@ -36,6 +36,9 @@ public class SpillableArrayListImpl<T> implements Spillable.SpillableArrayList<T
   private int size;
   private int numBatches;
 
+  private boolean isRunning = false;
+  private boolean isInWindow = false;
+
   private SpillableArrayListImpl()
   {
     //for kryo
@@ -252,23 +255,39 @@ public class SpillableArrayListImpl<T> implements Spillable.SpillableArrayList<T
   public void setup(Context.OperatorContext context)
   {
     map.setup(context);
+    isRunning = true;
   }
 
   @Override
   public void beginWindow(long windowId)
   {
     map.beginWindow(windowId);
+    isInWindow = true;
   }
 
   @Override
   public void endWindow()
   {
+    isInWindow = false;
     map.endWindow();
   }
 
   @Override
   public void teardown()
   {
+    isRunning = false;
     map.teardown();
+  }
+
+  @Override
+  public boolean isRunning()
+  {
+    return isRunning;
+  }
+
+  @Override
+  public boolean isInWindow()
+  {
+    return isInWindow;
   }
 }

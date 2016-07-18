@@ -34,6 +34,9 @@ public class SpillableByteMapImpl<K, V> implements Spillable.SpillableByteMap<K,
   private transient WindowBoundedMapCache<K, V> cache = new WindowBoundedMapCache<>();
   private transient MutableInt tempOffset = new MutableInt();
 
+  private boolean isRunning = false;
+  private boolean isInWindow = false;
+
   private SpillableByteMapImpl()
   {
     //for kryo
@@ -161,16 +164,19 @@ public class SpillableByteMapImpl<K, V> implements Spillable.SpillableByteMap<K,
   @Override
   public void setup(Context.OperatorContext context)
   {
+    isRunning = true;
   }
 
   @Override
   public void beginWindow(long windowId)
   {
+    isInWindow = true;
   }
 
   @Override
   public void endWindow()
   {
+    isInWindow = false;
     for (K key: cache.getChangedKeys()) {
       store.put(this.bucket, SliceUtils.concatenate(identifier, serdeKey.serialize(key)),
           SliceUtils.concatenate(identifier, serdeValue.serialize(cache.get(key))));
@@ -187,5 +193,18 @@ public class SpillableByteMapImpl<K, V> implements Spillable.SpillableByteMap<K,
   @Override
   public void teardown()
   {
+    isRunning = false;
+  }
+
+  @Override
+  public boolean isRunning()
+  {
+    return isRunning;
+  }
+
+  @Override
+  public boolean isInWindow()
+  {
+    return isInWindow;
   }
 }
