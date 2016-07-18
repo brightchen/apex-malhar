@@ -1,9 +1,8 @@
-package org.apache.apex.malhar.lib.state;
+package org.apache.apex.malhar.lib.state.spillable;
 
 import org.junit.Assert;
 import org.junit.Test;
 
-import org.apache.apex.malhar.lib.state.spillable.SpillableByteMapImpl;
 import org.apache.apex.malhar.lib.state.spillable.inmem.InMemSpillableStateStore;
 import org.apache.apex.malhar.lib.utils.serde.SerdeStringSlice;
 

@@ -42,6 +42,9 @@ public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.Spill
   private Serde<K, Slice> serdeKey;
   private Serde<V, Slice> serdeValue;
 
+  private boolean isRunning = false;
+  private boolean isInWindow = false;
+
   public SpillableByteArrayListMultimapImpl(SpillableStateStore store, byte[] identifier, long bucket,
       Serde<K, Slice> serdeKey,
       Serde<V, Slice> serdeValue)
@@ -209,17 +212,20 @@ public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.Spill
   public void setup(Context.OperatorContext context)
   {
     map.setup(context);
+    isRunning = true;
   }
 
   @Override
   public void beginWindow(long windowId)
   {
     map.beginWindow(windowId);
+    isInWindow = true;
   }
 
   @Override
   public void endWindow()
   {
+    isInWindow = false;
     for (K key: cache.getChangedKeys()) {
       SpillableArrayListImpl<V> spillableArrayList = cache.get(key);
       spillableArrayList.endWindow();
@@ -236,6 +242,19 @@ public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.Spill
   @Override
   public void teardown()
   {
+    isRunning = false;
     map.teardown();
+  }
+
+  @Override
+  public boolean isRunning()
+  {
+    return isRunning;
+  }
+
+  @Override
+  public boolean isInWindow()
+  {
+    return isInWindow;
   }
 }

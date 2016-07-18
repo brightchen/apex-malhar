@@ -1,11 +1,9 @@
-package org.apache.apex.malhar.lib.state;
+package org.apache.apex.malhar.lib.state.spillable;
 
 import java.util.Set;
 
 import org.junit.Assert;
 import org.junit.Test;
-
-import org.apache.apex.malhar.lib.state.spillable.TimeBasedPriorityQueue;
 
 import com.google.common.collect.Sets;
 

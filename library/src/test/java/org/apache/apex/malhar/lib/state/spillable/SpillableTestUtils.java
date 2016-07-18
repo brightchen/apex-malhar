@@ -1,10 +1,9 @@
-package org.apache.apex.malhar.lib.state;
+package org.apache.apex.malhar.lib.state.spillable;
 
 import java.util.List;
 
 import org.junit.Assert;
 
-import org.apache.apex.malhar.lib.state.spillable.SpillableStateStore;
 import org.apache.apex.malhar.lib.utils.serde.Serde;
 import org.apache.apex.malhar.lib.utils.serde.SerdeListSlice;
 import org.apache.apex.malhar.lib.utils.serde.SerdeStringSlice;
