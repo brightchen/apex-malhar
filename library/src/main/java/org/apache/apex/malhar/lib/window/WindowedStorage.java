@@ -22,6 +22,8 @@ import java.util.Map;
 
 import org.apache.hadoop.classification.InterfaceStability;
 
+import com.datatorrent.api.Component;
+import com.datatorrent.api.Context;
 import com.datatorrent.api.Operator;
 
 /**
@@ -29,7 +31,7 @@ import com.datatorrent.api.Operator;
  * make sure checkpointing and recovery will be done correctly.
  */
 @InterfaceStability.Unstable
-public interface WindowedStorage extends Operator.CheckpointNotificationListener
+public interface WindowedStorage extends Operator.CheckpointNotificationListener, Component<Context.OperatorContext>
 {
   /**
    * Returns true if the storage contains this window

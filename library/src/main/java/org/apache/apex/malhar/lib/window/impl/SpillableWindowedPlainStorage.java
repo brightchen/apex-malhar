@@ -5,13 +5,14 @@ import java.util.Map;
 
 import javax.validation.constraints.NotNull;
 
-import org.apache.apex.malhar.lib.state.spillable.SpillableByteMapImpl;
+import org.apache.apex.malhar.lib.state.spillable.Spillable;
+import org.apache.apex.malhar.lib.state.spillable.SpillableComplexComponentImpl;
+import org.apache.apex.malhar.lib.state.spillable.SpillableStateStore;
 import org.apache.apex.malhar.lib.state.spillable.managed.ManagedStateSpillableStateStore;
 import org.apache.apex.malhar.lib.utils.serde.Serde;
 import org.apache.apex.malhar.lib.window.Window;
 import org.apache.apex.malhar.lib.window.WindowedStorage;
 
-import com.datatorrent.api.Component;
 import com.datatorrent.api.Context;
 import com.datatorrent.netlet.util.Slice;
 
@@ -20,25 +21,29 @@ import com.datatorrent.netlet.util.Slice;
  *
  * @param <T> Type of the value per window
  */
-public class SpillableWindowedPlainStorage<T> implements WindowedStorage.WindowedPlainStorage<T>, Component<Context.OperatorContext>
+public class SpillableWindowedPlainStorage<T> implements WindowedStorage.WindowedPlainStorage<T>
 {
   @NotNull
-  private final ManagedStateSpillableStateStore store;
+  private final SpillableStateStore store;
+  private final SpillableComplexComponentImpl sccImpl;
 
-  protected final SpillableByteMapImpl<Window, T> internMap;
+  protected final Spillable.SpillableByteMap<Window, T> internMap;
 
   private SpillableWindowedPlainStorage()
   {
     // for kryo
     store = null;
+    sccImpl = null;
     internMap = null;
   }
 
   public SpillableWindowedPlainStorage(long bucket, byte[] identifier, Serde<Window, Slice> serdeWindow, Serde<T, Slice> serdeValue)
   {
+    // TODO: will move these to setup() once we know what bucket and identifier do
     store = new ManagedStateSpillableStateStore();
-    store.getCheckpointManager().setNeedBucketFile(false);
-    internMap = new SpillableByteMapImpl<>(store, identifier, bucket, serdeWindow, serdeValue);
+    //store.getCheckpointManager().setNeedBucketFile(false);
+    sccImpl = new SpillableComplexComponentImpl(store);
+    internMap = sccImpl.newSpillableByteMap(identifier, bucket, serdeWindow, serdeValue);
   }
 
   @Override
@@ -92,27 +97,25 @@ public class SpillableWindowedPlainStorage<T> implements WindowedStorage.Windowe
   @Override
   public void setup(Context.OperatorContext context)
   {
-    store.setup(context);
-    internMap.setup(context);
+    sccImpl.setup(context);
   }
 
   @Override
   public void teardown()
   {
-    internMap.teardown();
-    store.teardown();
+    sccImpl.teardown();
   }
 
   @Override
   public void beginApexWindow(long windowId)
   {
-    store.beginWindow(windowId);
+    sccImpl.beginWindow(windowId);
   }
 
   @Override
   public void endApexWindow()
   {
-    store.endWindow();
+    sccImpl.endWindow();
   }
 
   @Override

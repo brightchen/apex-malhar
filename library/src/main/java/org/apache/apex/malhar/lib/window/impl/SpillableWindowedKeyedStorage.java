@@ -3,17 +3,19 @@ package org.apache.apex.malhar.lib.window.impl;
 import java.util.List;
 import java.util.Map;
 
-import javax.annotation.concurrent.Immutable;
 import javax.validation.constraints.NotNull;
 
-import org.apache.apex.malhar.lib.state.spillable.SpillableByteArrayListMultimapImpl;
-import org.apache.apex.malhar.lib.state.spillable.SpillableByteMapImpl;
+import org.apache.apex.malhar.lib.state.spillable.Spillable;
+import org.apache.apex.malhar.lib.state.spillable.SpillableComplexComponentImpl;
+import org.apache.apex.malhar.lib.state.spillable.SpillableStateStore;
 import org.apache.apex.malhar.lib.state.spillable.managed.ManagedStateSpillableStateStore;
 import org.apache.apex.malhar.lib.utils.serde.Serde;
 import org.apache.apex.malhar.lib.window.Window;
 import org.apache.apex.malhar.lib.window.WindowedStorage;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 
+import com.datatorrent.api.Component;
+import com.datatorrent.api.Context;
 import com.datatorrent.netlet.util.Slice;
 
 /**
@@ -22,25 +24,30 @@ import com.datatorrent.netlet.util.Slice;
 public class SpillableWindowedKeyedStorage<K, V> implements WindowedStorage.WindowedKeyedStorage<K, V>
 {
   @NotNull
-  private final ManagedStateSpillableStateStore store;
+  private final SpillableStateStore store;
+  private final SpillableComplexComponentImpl sccImpl;
 
-  protected final SpillableByteMapImpl<ImmutablePair<Window, K>, V> internValues;
-  protected final SpillableByteArrayListMultimapImpl<Window, K> internKeys;
+  protected final Spillable.SpillableByteMap<ImmutablePair<Window, K>, V> internValues;
+  protected final Spillable.SpillableByteArrayListMultimap<Window, K> internKeys;
 
   private SpillableWindowedKeyedStorage()
   {
     // for kryo
     store = null;
+    sccImpl = null;
     internValues = null;
     internKeys = null;
   }
 
   public SpillableWindowedKeyedStorage(long bucket, byte[] identifier, Serde<Window, Slice> serdeWindow, Serde<K, Slice> serdeKey, Serde<ImmutablePair<Window, K>, Slice> serdeWindowKey, Serde<V, Slice> serdeValue)
   {
+    // TODO: will move these to setup() once we know what bucket and identifier do
+
     store = new ManagedStateSpillableStateStore();
-    store.getCheckpointManager().setNeedBucketFile(false);
-    internValues = new SpillableByteMapImpl<>(store, identifier, bucket, serdeWindowKey, serdeValue);
-    internKeys = new SpillableByteArrayListMultimapImpl<>(store, identifier, bucket, serdeWindow, serdeKey);
+    //store.getCheckpointManager().setNeedBucketFile(false);
+    sccImpl = new SpillableComplexComponentImpl(store);
+    internValues = sccImpl.newSpillableByteMap(identifier, bucket, serdeWindowKey, serdeValue);
+    internKeys = sccImpl.newSpillableByteArrayListMultimap(identifier, bucket, serdeWindow, serdeKey);
   }
 
   @Override
@@ -82,16 +89,29 @@ public class SpillableWindowedKeyedStorage<K, V> implements WindowedStorage.Wind
     internKeys.removeAll(fromWindow);
   }
 
+
+  @Override
+  public void setup(Context.OperatorContext context)
+  {
+    sccImpl.setup(context);
+  }
+
+  @Override
+  public void teardown()
+  {
+    sccImpl.teardown();
+  }
+
   @Override
   public void beginApexWindow(long windowId)
   {
-    store.beginWindow(windowId);
+    sccImpl.beginWindow(windowId);
   }
 
   @Override
   public void endApexWindow()
   {
-    store.endWindow();
+    sccImpl.endWindow();
   }
 
   @Override

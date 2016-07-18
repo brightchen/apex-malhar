@@ -389,6 +389,21 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
   {
     this.timeIncrement = context.getValue(Context.OperatorContext.APPLICATION_WINDOW_COUNT) * context.getValue(Context.DAGContext.STREAMING_WINDOW_SIZE_MILLIS);
     validate();
+    windowStateMap.setup(context);
+    dataStorage.setup(context);
+    if (retractionStorage != null) {
+      retractionStorage.setup(context);
+    }
+  }
+
+  @Override
+  public void teardown()
+  {
+    windowStateMap.teardown();
+    dataStorage.teardown();
+    if (retractionStorage != null) {
+      retractionStorage.teardown();
+    }
   }
 
   /**
@@ -522,6 +537,8 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
   {
     dataStorage.remove(window);
   }
+
+
 
   @Override
   public void beforeCheckpoint(long windowId)
