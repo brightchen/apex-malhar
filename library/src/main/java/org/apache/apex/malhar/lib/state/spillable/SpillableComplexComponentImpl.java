@@ -115,6 +115,7 @@ public class SpillableComplexComponentImpl implements SpillableComplexComponent
   @Override
   public void setup(Context.OperatorContext context)
   {
+    store.setup(context);
     for (SpillableComponent spillableComponent: componentList) {
       spillableComponent.setup(context);
     }
@@ -124,6 +125,7 @@ public class SpillableComplexComponentImpl implements SpillableComplexComponent
   @Override
   public void beginWindow(long windowId)
   {
+    store.beginWindow(windowId);
     for (SpillableComponent spillableComponent: componentList) {
       spillableComponent.beginWindow(windowId);
     }
@@ -137,6 +139,7 @@ public class SpillableComplexComponentImpl implements SpillableComplexComponent
     for (SpillableComponent spillableComponent: componentList) {
       spillableComponent.endWindow();
     }
+    store.endWindow();
   }
 
   @Override
@@ -146,6 +149,7 @@ public class SpillableComplexComponentImpl implements SpillableComplexComponent
     for (SpillableComponent spillableComponent: componentList) {
       spillableComponent.teardown();
     }
+    store.teardown();
   }
 
   @Override
