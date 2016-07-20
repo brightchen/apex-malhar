@@ -27,8 +27,6 @@ public class SpillableWindowedKeyedStorage<K, V> implements WindowedStorage.Wind
   private SpillableComplexComponentImpl sccImpl;
   private long bucket;
   @NotNull
-  private String identifier;
-  @NotNull
   private Serde<Window, Slice> windowSerde;
   @NotNull
   private Serde<ImmutablePair<Window, K>, Slice> windowKeyPairSerde;
@@ -44,11 +42,10 @@ public class SpillableWindowedKeyedStorage<K, V> implements WindowedStorage.Wind
   {
   }
 
-  public SpillableWindowedKeyedStorage(long bucket, String identifier,
+  public SpillableWindowedKeyedStorage(long bucket,
       Serde<Window, Slice> windowSerde, Serde<ImmutablePair<Window, K>, Slice> windowKeyPairSerde, Serde<K, Slice> keySerde, Serde<V, Slice> valueSerde)
   {
     this.bucket = bucket;
-    this.identifier = identifier;
     this.windowSerde = windowSerde;
     this.windowKeyPairSerde = windowKeyPairSerde;
     this.keySerde = keySerde;
@@ -63,11 +60,6 @@ public class SpillableWindowedKeyedStorage<K, V> implements WindowedStorage.Wind
   public void setBucket(long bucket)
   {
     this.bucket = bucket;
-  }
-
-  public void setIdentifier(String identifier)
-  {
-    this.identifier = identifier;
   }
 
   public void setWindowSerde(Serde<Window, Slice> windowSerde)
@@ -133,8 +125,8 @@ public class SpillableWindowedKeyedStorage<K, V> implements WindowedStorage.Wind
       store = new ManagedStateSpillableStateStore();
     }
     sccImpl = new SpillableComplexComponentImpl(store);
-    internValues = sccImpl.newSpillableByteMap((identifier + "#values").getBytes(), bucket, windowKeyPairSerde, valueSerde);
-    internKeys = sccImpl.newSpillableByteArrayListMultimap((identifier + "#keys").getBytes(), bucket, windowSerde, keySerde);
+    internValues = sccImpl.newSpillableByteMap(bucket, windowKeyPairSerde, valueSerde);
+    internKeys = sccImpl.newSpillableByteArrayListMultimap(bucket, windowSerde, keySerde);
     sccImpl.setup(context);
   }
 

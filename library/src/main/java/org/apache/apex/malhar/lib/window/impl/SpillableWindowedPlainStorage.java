@@ -28,8 +28,6 @@ public class SpillableWindowedPlainStorage<T> implements WindowedStorage.Windowe
   private SpillableComplexComponentImpl sccImpl;
   private long bucket;
   @NotNull
-  private String identifier;
-  @NotNull
   private Serde<Window, Slice> windowSerde;
   @NotNull
   private Serde<T, Slice> valueSerde;
@@ -40,10 +38,9 @@ public class SpillableWindowedPlainStorage<T> implements WindowedStorage.Windowe
   {
   }
 
-  public SpillableWindowedPlainStorage(long bucket, String identifier, Serde<Window, Slice> windowSerde, Serde<T, Slice> valueSerde)
+  public SpillableWindowedPlainStorage(long bucket, Serde<Window, Slice> windowSerde, Serde<T, Slice> valueSerde)
   {
     this.bucket = bucket;
-    this.identifier = identifier;
     this.windowSerde = windowSerde;
     this.valueSerde = valueSerde;
   }
@@ -56,11 +53,6 @@ public class SpillableWindowedPlainStorage<T> implements WindowedStorage.Windowe
   public void setBucket(long bucket)
   {
     this.bucket = bucket;
-  }
-
-  public void setIdentifier(String identifier)
-  {
-    this.identifier = identifier;
   }
 
   public void setWindowSerde(Serde<Window, Slice> windowSerde)
@@ -130,7 +122,7 @@ public class SpillableWindowedPlainStorage<T> implements WindowedStorage.Windowe
     }
     sccImpl = new SpillableComplexComponentImpl(store);
     sccImpl.setup(context);
-    internMap = sccImpl.newSpillableByteMap(identifier.getBytes(), bucket, windowSerde, valueSerde);
+    internMap = sccImpl.newSpillableByteMap(bucket, windowSerde, valueSerde);
   }
 
   @Override
