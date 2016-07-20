@@ -24,26 +24,53 @@ import com.datatorrent.netlet.util.Slice;
 public class SpillableWindowedPlainStorage<T> implements WindowedStorage.WindowedPlainStorage<T>
 {
   @NotNull
-  private final SpillableStateStore store;
-  private final SpillableComplexComponentImpl sccImpl;
+  private SpillableStateStore store;
+  private SpillableComplexComponentImpl sccImpl;
+  private long bucket;
+  @NotNull
+  private String identifier;
+  @NotNull
+  private Serde<Window, Slice> windowSerde;
+  @NotNull
+  private Serde<T, Slice> valueSerde;
 
-  protected final Spillable.SpillableByteMap<Window, T> internMap;
+  protected Spillable.SpillableByteMap<Window, T> internMap;
 
-  private SpillableWindowedPlainStorage()
+  public SpillableWindowedPlainStorage()
   {
-    // for kryo
-    store = null;
-    sccImpl = null;
-    internMap = null;
   }
 
-  public SpillableWindowedPlainStorage(long bucket, byte[] identifier, Serde<Window, Slice> serdeWindow, Serde<T, Slice> serdeValue)
+  public SpillableWindowedPlainStorage(long bucket, String identifier, Serde<Window, Slice> windowSerde, Serde<T, Slice> valueSerde)
   {
-    // TODO: will move these to setup() once we know what bucket and identifier do
-    store = new ManagedStateSpillableStateStore();
-    //store.getCheckpointManager().setNeedBucketFile(false);
-    sccImpl = new SpillableComplexComponentImpl(store);
-    internMap = sccImpl.newSpillableByteMap(identifier, bucket, serdeWindow, serdeValue);
+    this.bucket = bucket;
+    this.identifier = identifier;
+    this.windowSerde = windowSerde;
+    this.valueSerde = valueSerde;
+  }
+
+  public void setStore(SpillableStateStore store)
+  {
+    this.store = store;
+  }
+
+  public void setBucket(long bucket)
+  {
+    this.bucket = bucket;
+  }
+
+  public void setIdentifier(String identifier)
+  {
+    this.identifier = identifier;
+  }
+
+  public void setWindowSerde(Serde<Window, Slice> windowSerde)
+  {
+    this.windowSerde = windowSerde;
+  }
+
+  public void setValueSerde(Serde<T, Slice> valueSerde)
+  {
+    this.valueSerde = valueSerde;
   }
 
   @Override
@@ -97,7 +124,13 @@ public class SpillableWindowedPlainStorage<T> implements WindowedStorage.Windowe
   @Override
   public void setup(Context.OperatorContext context)
   {
+    if (store == null) {
+      // provide a default store
+      store = new ManagedStateSpillableStateStore();
+    }
+    sccImpl = new SpillableComplexComponentImpl(store);
     sccImpl.setup(context);
+    internMap = sccImpl.newSpillableByteMap(identifier.getBytes(), bucket, windowSerde, valueSerde);
   }
 
   @Override
