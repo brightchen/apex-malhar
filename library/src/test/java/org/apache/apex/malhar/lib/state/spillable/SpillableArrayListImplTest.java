@@ -28,12 +28,12 @@ public class SpillableArrayListImplTest
     list.beginWindow(windowId);
     windowId++;
 
-    checkOutOfBounds(list, 0);
+    SpillableTestUtils.checkOutOfBounds(list, 0);
     Assert.assertEquals(0, list.size());
 
     list.add("a");
 
-    checkOutOfBounds(list, 1);
+    SpillableTestUtils.checkOutOfBounds(list, 1);
     Assert.assertEquals(1, list.size());
 
     Assert.assertEquals("a", list.get(0));
@@ -47,7 +47,7 @@ public class SpillableArrayListImplTest
     Assert.assertEquals("b", list.get(2));
     Assert.assertEquals("c", list.get(3));
 
-    checkOutOfBounds(list, 4);
+    SpillableTestUtils.checkOutOfBounds(list, 4);
 
     list.endWindow();
 
@@ -111,12 +111,12 @@ public class SpillableArrayListImplTest
     list.beginWindow(windowId);
     windowId++;
 
-    checkOutOfBounds(list, 0);
+    SpillableTestUtils.checkOutOfBounds(list, 0);
     Assert.assertEquals(0, list.size());
 
     list.add("a");
 
-    checkOutOfBounds(list, 1);
+    SpillableTestUtils.checkOutOfBounds(list, 1);
     Assert.assertEquals(1, list.size());
 
     Assert.assertEquals("a", list.get(0));
@@ -134,7 +134,7 @@ public class SpillableArrayListImplTest
     Assert.assertEquals("f", list.get(6));
     Assert.assertEquals("g", list.get(7));
 
-    checkOutOfBounds(list, 20);
+    SpillableTestUtils.checkOutOfBounds(list, 20);
 
     list.endWindow();
 
@@ -218,17 +218,17 @@ public class SpillableArrayListImplTest
     list2.beginWindow(windowId);
     windowId++;
 
-    checkOutOfBounds(list1, 0);
+    SpillableTestUtils.checkOutOfBounds(list1, 0);
     Assert.assertEquals(0, list1.size());
 
     list1.add("a");
 
-    checkOutOfBounds(list2, 0);
+    SpillableTestUtils.checkOutOfBounds(list2, 0);
 
     list2.add("2a");
 
-    checkOutOfBounds(list1, 1);
-    checkOutOfBounds(list2, 1);
+    SpillableTestUtils.checkOutOfBounds(list1, 1);
+    SpillableTestUtils.checkOutOfBounds(list2, 1);
 
     Assert.assertEquals(1, list1.size());
     Assert.assertEquals(1, list2.size());
@@ -251,8 +251,8 @@ public class SpillableArrayListImplTest
     Assert.assertEquals("2a", list2.get(1));
     Assert.assertEquals("2b", list2.get(2));
 
-    checkOutOfBounds(list1, 4);
-    checkOutOfBounds(list2, 3);
+    SpillableTestUtils.checkOutOfBounds(list1, 4);
+    SpillableTestUtils.checkOutOfBounds(list2, 3);
 
     list1.endWindow();
     list2.endWindow();
@@ -333,18 +333,5 @@ public class SpillableArrayListImplTest
     SpillableTestUtils.checkValue(store, 0L, ID2, 2, Lists.<String>newArrayList("2b"));
     SpillableTestUtils.checkValue(store, 0L, ID2, 3, Lists.<String>newArrayList("2tt"));
     SpillableTestUtils.checkValue(store, 0L, ID2, 4, Lists.<String>newArrayList("2ab"));
-  }
-
-  private void checkOutOfBounds(SpillableArrayListImpl<String> list, int index)
-  {
-    boolean exceptionThrown = false;
-
-    try {
-      list.get(index);
-    } catch (IndexOutOfBoundsException ex) {
-      exceptionThrown = true;
-    }
-
-    Assert.assertTrue(exceptionThrown);
   }
 }
