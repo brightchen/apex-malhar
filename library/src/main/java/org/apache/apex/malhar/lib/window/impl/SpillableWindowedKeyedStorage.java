@@ -1,5 +1,7 @@
 package org.apache.apex.malhar.lib.window.impl;
 
+import java.util.AbstractMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -37,6 +39,39 @@ public class SpillableWindowedKeyedStorage<K, V> implements WindowedStorage.Wind
 
   protected Spillable.SpillableByteMap<ImmutablePair<Window, K>, V> internValues;
   protected Spillable.SpillableByteArrayListMultimap<Window, K> internKeys;
+
+  private class KVIterator implements Iterator<Map.Entry<K, V>>
+  {
+    final Window window;
+    final List<K> keys;
+    Iterator<K> iterator;
+
+    KVIterator(Window window)
+    {
+      this.window = window;
+      this.keys = internKeys.get(window);
+      this.iterator = this.keys.iterator();
+    }
+
+    @Override
+    public boolean hasNext()
+    {
+      return iterator.hasNext();
+    }
+
+    @Override
+    public Map.Entry<K, V> next()
+    {
+      K key = iterator.next();
+      return new AbstractMap.SimpleEntry<>(key, internValues.get(new ImmutablePair<>(window, key)));
+    }
+
+    @Override
+    public void remove()
+    {
+      throw new UnsupportedOperationException();
+    }
+  }
 
   public SpillableWindowedKeyedStorage()
   {
@@ -124,6 +159,10 @@ public class SpillableWindowedKeyedStorage<K, V> implements WindowedStorage.Wind
       // provide a default managed state store
       store = new ManagedStateSpillableStateStore();
     }
+    if (bucket == 0) {
+      // choose a bucket that is almost guaranteed to be unique
+      bucket = (context.getValue(Context.DAGContext.APPLICATION_NAME) + "#" + context.getId()).hashCode();
+    }
     sccImpl = new SpillableComplexComponentImpl(store);
     internValues = sccImpl.newSpillableByteMap(bucket, windowKeyPairSerde, valueSerde);
     internKeys = sccImpl.newSpillableByteArrayListMultimap(bucket, windowSerde, keySerde);
@@ -158,10 +197,16 @@ public class SpillableWindowedKeyedStorage<K, V> implements WindowedStorage.Wind
   }
 
   @Override
-  public Iterable<Map.Entry<K, V>> entrySet(Window window)
+  public Iterable<Map.Entry<K, V>> entrySet(final Window window)
   {
-    // TBD
-    throw new UnsupportedOperationException();
+    return new Iterable<Map.Entry<K, V>>()
+    {
+      @Override
+      public Iterator<Map.Entry<K, V>> iterator()
+      {
+        return new KVIterator(window);
+      }
+    };
   }
 
   @Override

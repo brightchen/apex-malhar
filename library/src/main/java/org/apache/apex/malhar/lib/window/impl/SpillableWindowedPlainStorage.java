@@ -120,6 +120,10 @@ public class SpillableWindowedPlainStorage<T> implements WindowedStorage.Windowe
       // provide a default store
       store = new ManagedStateSpillableStateStore();
     }
+    if (bucket == 0) {
+      // choose a bucket that is almost guaranteed to be unique
+      bucket = (context.getValue(Context.DAGContext.APPLICATION_NAME) + "#" + context.getId()).hashCode();
+    }
     sccImpl = new SpillableComplexComponentImpl(store);
     sccImpl.setup(context);
     internMap = sccImpl.newSpillableByteMap(bucket, windowSerde, valueSerde);
