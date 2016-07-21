@@ -153,6 +153,24 @@ public class SpillableComplexComponentImpl implements SpillableComplexComponent
   }
 
   @Override
+  public void beforeCheckpoint(long l)
+  {
+    store.beforeCheckpoint(l);
+  }
+
+  @Override
+  public void checkpointed(long l)
+  {
+    store.checkpointed(l);
+  }
+
+  @Override
+  public void committed(long l)
+  {
+    store.committed(l);
+  }
+
+  @Override
   public boolean isRunning()
   {
     return isRunning;

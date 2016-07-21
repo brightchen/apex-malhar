@@ -70,4 +70,17 @@ public class SpillableTestUtils
 
     Assert.assertEquals(expectedValue, string);
   }
+
+  public static void checkOutOfBounds(SpillableArrayListImpl<String> list, int index)
+  {
+    boolean exceptionThrown = false;
+
+    try {
+      list.get(index);
+    } catch (IndexOutOfBoundsException ex) {
+      exceptionThrown = true;
+    }
+
+    Assert.assertTrue(exceptionThrown);
+  }
 }
