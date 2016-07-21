@@ -23,11 +23,14 @@ public class SerdeArrayWithLVBuffer<T> implements Serde<T[], Slice>, SerToLVBuff
   @Override
   public void serTo(T[] objects, LVBuffer buffer)
   {
-    buffer.setObjectLength(objects.length);
+    int lengthPlaceHolderId = buffer.markPlaceHolderForLength();
+    
     SerToLVBuffer<T> serializer = getSerToLVBuffer(clazz);
     for(T object : objects) {
       serializer.serTo(object, buffer);
     }
+    
+    buffer.setValueForLengthPlaceHolder(lengthPlaceHolderId, buffer.getSize());
   }
   
   protected SerToLVBuffer<T> getSerToLVBuffer(Class<T> clazz)

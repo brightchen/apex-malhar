@@ -1,11 +1,14 @@
 package org.apache.apex.malhar.lib.utils.serde;
 
 import java.io.ByteArrayOutputStream;
-import java.nio.ByteBuffer;
-import java.nio.MappedByteBuffer;
+import java.io.IOException;
+import java.util.Map;
 
 import org.apache.commons.lang3.mutable.MutableInt;
 
+import com.google.common.collect.Maps;
+
+import com.datatorrent.lib.appdata.gpo.GPOUtils;
 import com.datatorrent.netlet.util.Slice;
 
 /**
@@ -16,11 +19,11 @@ import com.datatorrent.netlet.util.Slice;
 public class LVBuffer
 {
   protected static final int DEFAULT_CAPACITY = 10000;
-  protected ByteBuffer byteBuffer;
   
   ByteArrayOutputStream outputSteam = new ByteArrayOutputStream();
   
   protected int currentOffset = 0;
+  protected Map<Integer, Integer> placeHolderIdentifierToValue = Maps.newHashMap();
   
   public LVBuffer()
   {
@@ -29,12 +32,19 @@ public class LVBuffer
   
   public LVBuffer(int capacity)
   {
-    byteBuffer = ByteBuffer.allocate(capacity);
+    outputSteam = new ByteArrayOutputStream(capacity);
   }
   
+  protected transient final byte[] tmpLengthAsBytes = new byte[4];
+  protected transient final MutableInt tmpOffset = new MutableInt(0);
   public void setObjectLength(int length)
   {
-    outputSteam.write(length);
+    try {
+      GPOUtils.serializeInt(length, tmpLengthAsBytes, new MutableInt(0));
+      outputSteam.write(tmpLengthAsBytes);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
   
   /**
@@ -72,9 +82,22 @@ public class LVBuffer
    * 
    * @return the identity for this placeholder
    */
-  public long markPlaceHolderForLength()
+  protected final byte[] lengthPlaceHolder = new byte[]{0, 0, 0, 0};
+  public int markPlaceHolderForLength()
   {
+    try {
+      int offset = outputSteam.size();
+      outputSteam.write(lengthPlaceHolder);
+      return offset;
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
     
+  }
+  
+  public int getSize()
+  {
+    return outputSteam.size();
   }
   
   /**
@@ -82,13 +105,28 @@ public class LVBuffer
    * @param placeHolderId
    * @param length
    */
-  public void setValueForLengthPlaceHolder(long placeHolderId, int length)
+  public void setValueForLengthPlaceHolder(int placeHolderId, int length)
   {
-    
+    //don't convert to byte array now. just keep the information
+    placeHolderIdentifierToValue.put(placeHolderId, length);
   }
   
   public Slice toSlice()
   {
-    return new Slice(outputSteam.toByteArray());
+    byte[] data = outputSteam.toByteArray();
+    
+    MutableInt offset = new MutableInt();
+    for(Map.Entry<Integer, Integer> entry : placeHolderIdentifierToValue.entrySet()) {
+      offset.setValue(entry.getKey());
+      GPOUtils.serializeInt(entry.getValue(), data, offset);
+    }
+    return new Slice(data, 0, data.length);
+  }
+  
+  //reset environment for next object
+  public void reset()
+  {
+    outputSteam.reset();
+    placeHolderIdentifierToValue.clear();
   }
 }
