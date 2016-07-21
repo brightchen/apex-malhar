@@ -1,15 +1,32 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.apex.malhar.lib.window.impl;
 
 import java.util.Iterator;
 import java.util.Map;
-
-import javax.validation.constraints.NotNull;
 
 import org.apache.apex.malhar.lib.state.spillable.Spillable;
 import org.apache.apex.malhar.lib.state.spillable.SpillableComplexComponentImpl;
 import org.apache.apex.malhar.lib.state.spillable.SpillableStateStore;
 import org.apache.apex.malhar.lib.state.spillable.managed.ManagedStateSpillableStateStore;
 import org.apache.apex.malhar.lib.utils.serde.Serde;
+import org.apache.apex.malhar.lib.utils.serde.SerdeKryoSlice;
 import org.apache.apex.malhar.lib.window.Window;
 import org.apache.apex.malhar.lib.window.WindowedStorage;
 
@@ -17,13 +34,12 @@ import com.datatorrent.api.Context;
 import com.datatorrent.netlet.util.Slice;
 
 /**
- * This is an implementation of WindowedPlainStorage that makes use of Spillable data structures
+ * This is an implementation of WindowedPlainStorage that makes use of {@link Spillable} data structures
  *
  * @param <T> Type of the value per window
  */
 public class SpillableWindowedPlainStorage<T> implements WindowedStorage.WindowedPlainStorage<T>
 {
-  @NotNull
   private SpillableStateStore store;
   private SpillableComplexComponentImpl sccImpl;
   private long bucket;
@@ -124,11 +140,10 @@ public class SpillableWindowedPlainStorage<T> implements WindowedStorage.Windowe
     }
     // set default serdes
     if (windowSerde == null) {
-      // provide a default window serde
-      windowSerde = new SerdeKryoSlice<Window>();
+      windowSerde = new SerdeKryoSlice<>();
     }
     if (valueSerde == null) {
-      valueSerde = new SerdeKryoSlice<T>();
+      valueSerde = new SerdeKryoSlice<>();
     }
     sccImpl = new SpillableComplexComponentImpl(store);
     sccImpl.setup(context);
@@ -156,18 +171,18 @@ public class SpillableWindowedPlainStorage<T> implements WindowedStorage.Windowe
   @Override
   public void beforeCheckpoint(long windowId)
   {
-    store.beforeCheckpoint(windowId);
+    sccImpl.beforeCheckpoint(windowId);
   }
 
   @Override
   public void checkpointed(long windowId)
   {
-    store.checkpointed(windowId);
+    sccImpl.checkpointed(windowId);
   }
 
   @Override
   public void committed(long windowId)
   {
-    store.committed(windowId);
+    sccImpl.committed(windowId);
   }
 }
