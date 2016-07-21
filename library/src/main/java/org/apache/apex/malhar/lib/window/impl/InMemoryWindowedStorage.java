@@ -27,6 +27,8 @@ import org.apache.apex.malhar.lib.window.Window;
 import org.apache.apex.malhar.lib.window.WindowedStorage;
 import org.apache.hadoop.classification.InterfaceStability;
 
+import com.datatorrent.api.Context;
+
 /**
  * This is the in-memory implementation of {@link WindowedPlainStorage}. Do not use this class if you have a large state that
  * can't be fit in memory. Also, this class may go away soon as there are plans to incorporate {@link Spillable} data
@@ -85,6 +87,16 @@ public class InMemoryWindowedStorage<T> implements WindowedStorage.WindowedPlain
   public Iterator<Map.Entry<Window, T>> iterator()
   {
     return map.entrySet().iterator();
+  }
+
+  @Override
+  public void setup(Context.OperatorContext context)
+  {
+  }
+
+  @Override
+  public void teardown()
+  {
   }
 
   @Override

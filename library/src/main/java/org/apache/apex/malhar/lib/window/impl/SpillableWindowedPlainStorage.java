@@ -27,9 +27,7 @@ public class SpillableWindowedPlainStorage<T> implements WindowedStorage.Windowe
   private SpillableStateStore store;
   private SpillableComplexComponentImpl sccImpl;
   private long bucket;
-  @NotNull
   private Serde<Window, Slice> windowSerde;
-  @NotNull
   private Serde<T, Slice> valueSerde;
 
   protected Spillable.SpillableByteMap<Window, T> internMap;
@@ -123,6 +121,14 @@ public class SpillableWindowedPlainStorage<T> implements WindowedStorage.Windowe
     if (bucket == 0) {
       // choose a bucket that is almost guaranteed to be unique
       bucket = (context.getValue(Context.DAGContext.APPLICATION_NAME) + "#" + context.getId()).hashCode();
+    }
+    // set default serdes
+    if (windowSerde == null) {
+      // provide a default window serde
+      windowSerde = new SerdeKryoSlice<Window>();
+    }
+    if (valueSerde == null) {
+      valueSerde = new SerdeKryoSlice<T>();
     }
     sccImpl = new SpillableComplexComponentImpl(store);
     sccImpl.setup(context);
