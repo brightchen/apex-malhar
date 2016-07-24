@@ -69,18 +69,18 @@ public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.Spill
     SpillableArrayListImpl<V> spillableArrayList = cache.get(key);
 
     if (spillableArrayList == null) {
-      Slice keyPrefix = serdeKey.serialize(key);
-      Integer size = map.get(SliceUtils.concatenate(keyPrefix, SIZE_KEY_SUFFIX));
+      Slice keyPrefix = SliceUtils.concatenate(identifier, serdeKey.serialize(key));
+      Integer size = map.get(SliceUtils.concatenate(keyPrefix, SIZE_KEY_SUFFIX).toByteArray());
 
       if (size == null) {
         return null;
       }
 
-      spillableArrayList = new SpillableArrayListImpl<V>(bucket, keyPrefix.buffer, store, serdeValue);
+      spillableArrayList = new SpillableArrayListImpl<V>(bucket, keyPrefix.toByteArray(), store, serdeValue);
       spillableArrayList.setSize(size);
-
-      cache.put(key, spillableArrayList);
     }
+
+    cache.put(key, spillableArrayList);
 
     return spillableArrayList;
   }
@@ -157,7 +157,8 @@ public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.Spill
     SpillableArrayListImpl<V> spillableArrayList = getHelper(key);
 
     if (spillableArrayList == null) {
-      spillableArrayList = new SpillableArrayListImpl<V>(bucket, serdeKey.serialize(key).buffer, store, serdeValue);
+      Slice keyPrefix = SliceUtils.concatenate(identifier, serdeKey.serialize(key));
+      spillableArrayList = new SpillableArrayListImpl<V>(bucket, keyPrefix.toByteArray(), store, serdeValue);
 
       cache.put(key, spillableArrayList);
     }
@@ -227,10 +228,11 @@ public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.Spill
   {
     isInWindow = false;
     for (K key: cache.getChangedKeys()) {
+
       SpillableArrayListImpl<V> spillableArrayList = cache.get(key);
       spillableArrayList.endWindow();
 
-      Integer size = map.put(SliceUtils.concatenate(serdeKey.serialize(key), SIZE_KEY_SUFFIX).buffer,
+      Integer size = map.put(SliceUtils.concatenate(serdeKey.serialize(key), SIZE_KEY_SUFFIX).toByteArray(),
           spillableArrayList.size());
     }
 

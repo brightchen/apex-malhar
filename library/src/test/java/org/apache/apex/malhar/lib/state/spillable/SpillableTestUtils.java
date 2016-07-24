@@ -43,14 +43,14 @@ public class SpillableTestUtils
       byte[] prefix, String expectedValue)
   {
     checkValue(store, bucketId, SliceUtils.concatenate(prefix, SERDE_STRING_SLICE.serialize(key)).buffer,
-        expectedValue, prefix.length, SERDE_STRING_SLICE);
+        expectedValue, 0, SERDE_STRING_SLICE);
   }
 
   public static void checkValue(SpillableStateStore store, long bucketId,
       byte[] prefix, int index, List<String> expectedValue)
   {
-    checkValue(store, bucketId, SliceUtils.concatenate(prefix, GPOUtils.serializeInt(index)), expectedValue, prefix
-        .length, SERDE_STRING_LIST_SLICE);
+    checkValue(store, bucketId, SliceUtils.concatenate(prefix, GPOUtils.serializeInt(index)), expectedValue, 0,
+        SERDE_STRING_LIST_SLICE);
   }
 
   public static <T> void  checkValue(SpillableStateStore store, long bucketId, byte[] bytes,
