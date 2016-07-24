@@ -1,6 +1,7 @@
 package org.apache.apex.malhar.lib.state.spillable;
 
 import org.junit.Assert;
+import org.junit.Rule;
 import org.junit.Test;
 
 import org.apache.apex.malhar.lib.state.spillable.inmem.InMemSpillableStateStore;
@@ -11,11 +12,25 @@ import org.apache.apex.malhar.lib.utils.serde.SerdeStringSlice;
  */
 public class SpillableComplexComponentImplTest
 {
+  @Rule
+  public SpillableTestUtils.TestMeta testMeta = new SpillableTestUtils.TestMeta();
+
   @Test
   public void simpleIntegrationTest()
   {
     InMemSpillableStateStore store = new InMemSpillableStateStore();
 
+    simpleIntegrationTestHelper(store);
+  }
+
+  @Test
+  public void simpleIntegrationManagedStateTest()
+  {
+    simpleIntegrationTestHelper(testMeta.store);
+  }
+  
+  public void simpleIntegrationTestHelper(SpillableStateStore store)
+  {
     SpillableComplexComponentImpl sccImpl = new SpillableComplexComponentImpl(store);
 
     Spillable.SpillableComponent scList =
@@ -26,7 +41,7 @@ public class SpillableComplexComponentImplTest
     Assert.assertFalse(scList.isRunning());
     Assert.assertFalse(scMap.isRunning());
 
-    sccImpl.setup(null);
+    sccImpl.setup(testMeta.operatorContext);
 
     Assert.assertTrue(scList.isRunning());
     Assert.assertTrue(scMap.isRunning());
