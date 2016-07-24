@@ -1,6 +1,7 @@
 package org.apache.apex.malhar.lib.state.spillable;
 
 import org.junit.Assert;
+import org.junit.Rule;
 import org.junit.Test;
 
 import org.apache.apex.malhar.lib.state.spillable.inmem.InMemSpillableStateStore;
@@ -16,15 +17,33 @@ public class SpillableArrayListImplTest
   public static final byte[] ID1 = new byte[]{(byte)0};
   public static final byte[] ID2 = new byte[]{(byte)1};
 
+  @Rule
+  public SpillableTestUtils.TestMeta testMeta = new SpillableTestUtils.TestMeta();
+
   @Test
   public void simpleAddGetAndSetTest1()
   {
     InMemSpillableStateStore store = new InMemSpillableStateStore();
 
+    simpleAddGetAndSetTest1Helper(store);
+  }
+
+  @Test
+  public void simpleAddGetAndSetManagedStateTest1()
+  {
+    simpleAddGetAndSetTest1Helper(testMeta.store);
+  }
+
+  public void simpleAddGetAndSetTest1Helper(SpillableStateStore store)
+  {
     SpillableArrayListImpl<String> list = new SpillableArrayListImpl<>(0L, ID1, store,
         new SerdeStringSlice(), 1);
 
+    store.setup(testMeta.operatorContext);
+    list.setup(testMeta.operatorContext);
+
     long windowId = 0L;
+    store.beginWindow(windowId);
     list.beginWindow(windowId);
     windowId++;
 
@@ -50,14 +69,19 @@ public class SpillableArrayListImplTest
     SpillableTestUtils.checkOutOfBounds(list, 4);
 
     list.endWindow();
+    store.endWindow();
+    store.beforeCheckpoint(windowId);
+    store.checkpointed(windowId);
+    store.committed(windowId);
+
+    store.beginWindow(windowId);
+    list.beginWindow(windowId);
+    windowId++;
 
     SpillableTestUtils.checkValue(store, 0L, ID1, 0, Lists.<String>newArrayList("a"));
     SpillableTestUtils.checkValue(store, 0L, ID1, 1, Lists.<String>newArrayList("a"));
     SpillableTestUtils.checkValue(store, 0L, ID1, 2, Lists.<String>newArrayList("b"));
     SpillableTestUtils.checkValue(store, 0L, ID1, 3, Lists.<String>newArrayList("c"));
-
-    list.beginWindow(windowId);
-    windowId++;
 
     Assert.assertEquals(4, list.size());
 
@@ -88,6 +112,13 @@ public class SpillableArrayListImplTest
     Assert.assertEquals("oo", list.get(7));
 
     list.endWindow();
+    store.endWindow();
+    store.beforeCheckpoint(windowId);
+    store.checkpointed(windowId);
+    store.committed(windowId);
+
+    store.beginWindow(windowId);
+    list.beginWindow(windowId);
 
     SpillableTestUtils.checkValue(store, 0L, ID1, 0, Lists.<String>newArrayList("a"));
     SpillableTestUtils.checkValue(store, 0L, ID1, 1, Lists.<String>newArrayList("111"));
@@ -97,6 +128,15 @@ public class SpillableArrayListImplTest
     SpillableTestUtils.checkValue(store, 0L, ID1, 5, Lists.<String>newArrayList("ab"));
     SpillableTestUtils.checkValue(store, 0L, ID1, 6, Lists.<String>newArrayList("99"));
     SpillableTestUtils.checkValue(store, 0L, ID1, 7, Lists.<String>newArrayList("oo"));
+
+    list.endWindow();
+    store.endWindow();
+    store.beforeCheckpoint(windowId);
+    store.checkpointed(windowId);
+    store.committed(windowId);
+
+    list.teardown();
+    store.teardown();
   }
 
   @Test
@@ -104,10 +144,25 @@ public class SpillableArrayListImplTest
   {
     InMemSpillableStateStore store = new InMemSpillableStateStore();
 
+    simpleAddGetAndSetTest3Helper(store);
+  }
+
+  @Test
+  public void simpleAddGetAndSetManagedStateTest3()
+  {
+    simpleAddGetAndSetTest3Helper(testMeta.store);
+  }
+
+  private void simpleAddGetAndSetTest3Helper(SpillableStateStore store)
+  {
     SpillableArrayListImpl<String> list = new SpillableArrayListImpl<>(0L, ID1, store,
         new SerdeStringSlice(), 3);
 
+    store.setup(testMeta.operatorContext);
+    list.setup(testMeta.operatorContext);
+
     long windowId = 0L;
+    store.beginWindow(windowId);
     list.beginWindow(windowId);
     windowId++;
 
@@ -137,13 +192,18 @@ public class SpillableArrayListImplTest
     SpillableTestUtils.checkOutOfBounds(list, 20);
 
     list.endWindow();
+    store.endWindow();
+    store.beforeCheckpoint(windowId);
+    store.checkpointed(windowId);
+    store.committed(windowId);
+
+    store.beginWindow(windowId);
+    list.beginWindow(windowId);
+    windowId++;
 
     SpillableTestUtils.checkValue(store, 0L, ID1, 0, Lists.<String>newArrayList("a", "a", "b"));
     SpillableTestUtils.checkValue(store, 0L, ID1, 1, Lists.<String>newArrayList("c", "d", "e"));
     SpillableTestUtils.checkValue(store, 0L, ID1, 2, Lists.<String>newArrayList("f", "g"));
-
-    list.beginWindow(windowId);
-    windowId++;
 
     Assert.assertEquals(8, list.size());
 
@@ -167,14 +227,19 @@ public class SpillableArrayListImplTest
     Assert.assertEquals("oo", list.get(11));
 
     list.endWindow();
+    store.endWindow();
+    store.beforeCheckpoint(windowId);
+    store.checkpointed(windowId);
+    store.committed(windowId);
+
+    store.beginWindow(windowId);
+    list.beginWindow(windowId);
+    windowId++;
 
     SpillableTestUtils.checkValue(store, 0L, ID1, 0, Lists.<String>newArrayList("a", "a", "b"));
     SpillableTestUtils.checkValue(store, 0L, ID1, 1, Lists.<String>newArrayList("c", "d", "e"));
     SpillableTestUtils.checkValue(store, 0L, ID1, 2, Lists.<String>newArrayList("f", "g", "tt"));
     SpillableTestUtils.checkValue(store, 0L, ID1, 3, Lists.<String>newArrayList("ab", "99", "oo"));
-
-    list.beginWindow(windowId);
-    windowId++;
 
     list.set(1, "111");
     list.set(3, "222");
@@ -195,11 +260,27 @@ public class SpillableArrayListImplTest
     Assert.assertEquals("444", list.get(11));
 
     list.endWindow();
+    store.endWindow();
+    store.beforeCheckpoint(windowId);
+    store.checkpointed(windowId);
+    store.committed(windowId);
+
+    store.beginWindow(windowId);
+    list.beginWindow(windowId);
 
     SpillableTestUtils.checkValue(store, 0L, ID1, 0, Lists.<String>newArrayList("a", "111", "b"));
     SpillableTestUtils.checkValue(store, 0L, ID1, 1, Lists.<String>newArrayList("222", "d", "333"));
     SpillableTestUtils.checkValue(store, 0L, ID1, 2, Lists.<String>newArrayList("f", "g", "tt"));
     SpillableTestUtils.checkValue(store, 0L, ID1, 3, Lists.<String>newArrayList("ab", "99", "444"));
+
+    list.endWindow();
+    store.endWindow();
+    store.beforeCheckpoint(windowId);
+    store.checkpointed(windowId);
+    store.committed(windowId);
+
+    list.teardown();
+    store.teardown();
   }
 
   @Test
@@ -207,13 +288,29 @@ public class SpillableArrayListImplTest
   {
     InMemSpillableStateStore store = new InMemSpillableStateStore();
 
+    simpleMultiListTestHelper(store);
+  }
+
+  @Test
+  public void simpleMultiListManagedStateTest()
+  {
+    simpleMultiListTestHelper(testMeta.store);
+  }
+
+  public void simpleMultiListTestHelper(SpillableStateStore store)
+  {
     SpillableArrayListImpl<String> list1 = new SpillableArrayListImpl<>(0L, ID1, store,
         new SerdeStringSlice(), 1);
 
     SpillableArrayListImpl<String> list2 = new SpillableArrayListImpl<>(0L, ID2, store,
         new SerdeStringSlice(), 1);
 
+    store.setup(testMeta.operatorContext);
+    list1.setup(testMeta.operatorContext);
+    list2.setup(testMeta.operatorContext);
+
     long windowId = 0L;
+    store.beginWindow(windowId);
     list1.beginWindow(windowId);
     list2.beginWindow(windowId);
     windowId++;
@@ -256,6 +353,10 @@ public class SpillableArrayListImplTest
 
     list1.endWindow();
     list2.endWindow();
+    store.endWindow();
+    store.beforeCheckpoint(windowId);
+    store.checkpointed(windowId);
+    store.committed(windowId);
 
     SpillableTestUtils.checkValue(store, 0L, ID1, 0, Lists.<String>newArrayList("a"));
     SpillableTestUtils.checkValue(store, 0L, ID1, 1, Lists.<String>newArrayList("a"));
@@ -266,6 +367,7 @@ public class SpillableArrayListImplTest
     SpillableTestUtils.checkValue(store, 0L, ID2, 1, Lists.<String>newArrayList("2a"));
     SpillableTestUtils.checkValue(store, 0L, ID2, 2, Lists.<String>newArrayList("2b"));
 
+    store.beginWindow(windowId);
     list1.beginWindow(windowId);
     list2.beginWindow(windowId);
     windowId++;
@@ -318,6 +420,14 @@ public class SpillableArrayListImplTest
 
     list1.endWindow();
     list2.endWindow();
+    store.endWindow();
+    store.beforeCheckpoint(windowId);
+    store.checkpointed(windowId);
+    store.committed(windowId);
+
+    store.beginWindow(windowId);
+    list1.beginWindow(windowId);
+    list2.beginWindow(windowId);
 
     SpillableTestUtils.checkValue(store, 0L, ID1, 0, Lists.<String>newArrayList("a"));
     SpillableTestUtils.checkValue(store, 0L, ID1, 1, Lists.<String>newArrayList("111"));
@@ -333,5 +443,16 @@ public class SpillableArrayListImplTest
     SpillableTestUtils.checkValue(store, 0L, ID2, 2, Lists.<String>newArrayList("2b"));
     SpillableTestUtils.checkValue(store, 0L, ID2, 3, Lists.<String>newArrayList("2tt"));
     SpillableTestUtils.checkValue(store, 0L, ID2, 4, Lists.<String>newArrayList("2ab"));
+
+    list1.endWindow();
+    list2.endWindow();
+    store.endWindow();
+    store.beforeCheckpoint(windowId);
+    store.checkpointed(windowId);
+    store.committed(windowId);
+
+    list1.teardown();
+    list2.teardown();
+    store.teardown();
   }
 }
