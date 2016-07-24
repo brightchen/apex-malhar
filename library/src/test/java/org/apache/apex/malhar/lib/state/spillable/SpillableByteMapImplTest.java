@@ -23,32 +23,8 @@ public class SpillableByteMapImplTest
   public static final byte[] ID1 = new byte[]{(byte)0};
   public static final byte[] ID2 = new byte[]{(byte)1};
 
-  class TestMeta extends TestWatcher
-  {
-    ManagedStateSpillableStateStore store;
-    Context.OperatorContext operatorContext;
-    String applicationPath;
-
-    @Override
-    protected void starting(Description description)
-    {
-      TestUtils.deleteTargetTestClassFolder(description);
-      store = new ManagedStateSpillableStateStore();
-      applicationPath = "target/" + description.getClassName() + "/" + description.getMethodName();
-      ((FileAccessFSImpl)store.getFileAccess()).setBasePath(applicationPath + "/" + "bucket_data");
-
-      operatorContext = ManagedStateTestUtils.getOperatorContext(1, applicationPath);
-    }
-
-    @Override
-    protected void finished(Description description)
-    {
-      TestUtils.deleteTargetTestClassFolder(description);
-    }
-  }
-
   @Rule
-  public TestMeta testMeta = new TestMeta();
+  public SpillableTestUtils.TestMeta testMeta = new SpillableTestUtils.TestMeta();
 
   @Test
   public void simpleGetAndPutTest()
@@ -73,6 +49,7 @@ public class SpillableByteMapImplTest
         new SerdeStringSlice());
 
     store.setup(testMeta.operatorContext);
+    map.setup(testMeta.operatorContext);
 
     long windowId = 0L;
     store.beginWindow(windowId);
@@ -103,14 +80,14 @@ public class SpillableByteMapImplTest
     store.checkpointed(windowId);
     store.committed(windowId);
 
+    store.beginWindow(windowId);
+    map.beginWindow(windowId);
+    windowId++;
+
     SpillableTestUtils.checkValue(store, 0L, "a", ID1, "1");
     SpillableTestUtils.checkValue(store, 0L, "b", ID1, "2");
     SpillableTestUtils.checkValue(store, 0L, "c", ID1, "3");
     SpillableTestUtils.checkValue(store, 0L, "d", ID1, null);
-
-    store.beginWindow(windowId);
-    map.beginWindow(windowId);
-    windowId++;
 
     Assert.assertEquals(3, map.size());
 
@@ -160,20 +137,37 @@ public class SpillableByteMapImplTest
     store.checkpointed(windowId);
     store.committed(windowId);
 
+    map.teardown();
     store.teardown();
   }
 
   @Test
   public void simpleRemoveTest()
   {
+    InMemSpillableStateStore store = new InMemSpillableStateStore();
+
+    simpleRemoveTestHelper(store);
+  }
+
+  @Test
+  public void simpleRemoveManagedStateTest()
+  {
+    simpleRemoveTestHelper(testMeta.store);
+  }
+
+  private void simpleRemoveTestHelper(SpillableStateStore store)
+  {
     SerdeStringSlice sss = new SerdeStringSlice();
 
-    InMemSpillableStateStore store = new InMemSpillableStateStore();
     SpillableByteMapImpl<String, String> map = new SpillableByteMapImpl<>(store, ID1, 0L,
         new SerdeStringSlice(),
         new SerdeStringSlice());
 
+    store.setup(testMeta.operatorContext);
+    map.setup(testMeta.operatorContext);
+
     long windowId = 0L;
+    store.beginWindow(windowId);
     map.beginWindow(windowId);
     windowId++;
 
@@ -201,12 +195,17 @@ public class SpillableByteMapImplTest
     SpillableTestUtils.checkValue(store, 0L, "d", ID1, null);
 
     map.endWindow();
+    store.endWindow();
+    store.beforeCheckpoint(windowId);
+    store.checkpointed(windowId);
+    store.committed(windowId);
 
     SpillableTestUtils.checkValue(store, 0L, "a", ID1, "1");
     SpillableTestUtils.checkValue(store, 0L, "b", ID1, null);
     SpillableTestUtils.checkValue(store, 0L, "c", ID1, null);
     SpillableTestUtils.checkValue(store, 0L, "d", ID1, null);
 
+    store.beginWindow(windowId);
     map.beginWindow(windowId);
     windowId++;
 
@@ -235,6 +234,14 @@ public class SpillableByteMapImplTest
     SpillableTestUtils.checkValue(store, 0L, "f", ID1, null);
 
     map.endWindow();
+    store.endWindow();
+    store.beforeCheckpoint(windowId);
+    store.checkpointed(windowId);
+    store.committed(windowId);
+
+    store.beginWindow(windowId);
+    map.beginWindow(windowId);
+    windowId++;
 
     SpillableTestUtils.checkValue(store, 0L, "a", ID1, "1");
     SpillableTestUtils.checkValue(store, 0L, "b", ID1, null);
@@ -243,9 +250,6 @@ public class SpillableByteMapImplTest
     SpillableTestUtils.checkValue(store, 0L, "e", ID1, "5");
     SpillableTestUtils.checkValue(store, 0L, "f", ID1, "6");
     SpillableTestUtils.checkValue(store, 0L, "g", ID1, null);
-
-    map.beginWindow(windowId);
-    windowId++;
 
     map.remove("a");
     map.remove("d");
@@ -266,6 +270,13 @@ public class SpillableByteMapImplTest
     SpillableTestUtils.checkValue(store, 0L, "g", ID1, null);
 
     map.endWindow();
+    store.endWindow();
+    store.beforeCheckpoint(windowId);
+    store.checkpointed(windowId);
+    store.committed(windowId);
+
+    store.beginWindow(windowId);
+    map.beginWindow(windowId);
 
     SpillableTestUtils.checkValue(store, 0L, "a", ID1, null);
     SpillableTestUtils.checkValue(store, 0L, "b", ID1, null);
@@ -274,14 +285,35 @@ public class SpillableByteMapImplTest
     SpillableTestUtils.checkValue(store, 0L, "e", ID1, "5");
     SpillableTestUtils.checkValue(store, 0L, "f", ID1, "6");
     SpillableTestUtils.checkValue(store, 0L, "g", ID1, null);
+
+    map.endWindow();
+    store.endWindow();
+    store.beforeCheckpoint(windowId);
+    store.checkpointed(windowId);
+    store.committed(windowId);
+
+    map.teardown();
+    store.teardown();
   }
 
   @Test
   public void multiMapPerBucketTest()
   {
+    InMemSpillableStateStore store = new InMemSpillableStateStore();
+
+    multiMapPerBucketTestHelper(store);
+  }
+
+  @Test
+  public void multiMapPerBucketManagedStateTest()
+  {
+    multiMapPerBucketTestHelper(testMeta.store);
+  }
+
+  public void multiMapPerBucketTestHelper(SpillableStateStore store)
+  {
     SerdeStringSlice sss = new SerdeStringSlice();
 
-    InMemSpillableStateStore store = new InMemSpillableStateStore();
     SpillableByteMapImpl<String, String> map1 = new SpillableByteMapImpl<>(store, ID1, 0L,
         new SerdeStringSlice(),
         new SerdeStringSlice());
@@ -289,7 +321,12 @@ public class SpillableByteMapImplTest
         new SerdeStringSlice(),
         new SerdeStringSlice());
 
+    store.setup(testMeta.operatorContext);
+    map1.setup(testMeta.operatorContext);
+    map2.setup(testMeta.operatorContext);
+
     long windowId = 0L;
+    store.beginWindow(windowId);
     map1.beginWindow(windowId);
     map2.beginWindow(windowId);
     windowId++;
@@ -316,6 +353,14 @@ public class SpillableByteMapImplTest
 
     map1.endWindow();
     map2.endWindow();
+    store.endWindow();
+    store.beforeCheckpoint(windowId);
+    store.checkpointed(windowId);
+
+    store.beginWindow(windowId);
+    map1.beginWindow(windowId);
+    map2.beginWindow(windowId);
+    windowId++;
 
     SpillableTestUtils.checkValue(store, 0L, "a", ID1, "1");
     SpillableTestUtils.checkValue(store, 0L, "b", ID1, "2");
@@ -324,10 +369,6 @@ public class SpillableByteMapImplTest
     SpillableTestUtils.checkValue(store, 0L, "b", ID2, null);
     SpillableTestUtils.checkValue(store, 0L, "c", ID2, "3");
 
-    map1.beginWindow(windowId);
-    map2.beginWindow(windowId);
-    windowId++;
-
     map1.remove("a");
 
     Assert.assertEquals(null, map1.get("a"));
@@ -335,8 +376,25 @@ public class SpillableByteMapImplTest
 
     map1.endWindow();
     map2.endWindow();
+    store.endWindow();
+    store.beforeCheckpoint(windowId);
+    store.checkpointed(windowId);
+
+    store.beginWindow(windowId);
+    map1.beginWindow(windowId);
+    map2.beginWindow(windowId);
 
     SpillableTestUtils.checkValue(store, 0L, "a", ID1, null);
     SpillableTestUtils.checkValue(store, 0L, "a", ID2, "a1");
+
+    map1.endWindow();
+    map2.endWindow();
+    store.endWindow();
+    store.beforeCheckpoint(windowId);
+    store.checkpointed(windowId);
+
+    map1.teardown();
+    map2.teardown();
+    store.teardown();
   }
 }

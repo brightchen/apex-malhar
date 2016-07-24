@@ -3,14 +3,21 @@ package org.apache.apex.malhar.lib.state.spillable;
 import java.util.List;
 
 import org.junit.Assert;
+import org.junit.rules.TestWatcher;
+import org.junit.runner.Description;
 
+import org.apache.apex.malhar.lib.state.managed.ManagedStateTestUtils;
+import org.apache.apex.malhar.lib.state.spillable.managed.ManagedStateSpillableStateStore;
 import org.apache.apex.malhar.lib.utils.serde.Serde;
 import org.apache.apex.malhar.lib.utils.serde.SerdeListSlice;
 import org.apache.apex.malhar.lib.utils.serde.SerdeStringSlice;
 import org.apache.apex.malhar.lib.utils.serde.SliceUtils;
 import org.apache.commons.lang3.mutable.MutableInt;
 
+import com.datatorrent.api.Context;
 import com.datatorrent.lib.appdata.gpo.GPOUtils;
+import com.datatorrent.lib.fileaccess.FileAccessFSImpl;
+import com.datatorrent.lib.util.TestUtils;
 import com.datatorrent.netlet.util.Slice;
 
 /**
@@ -21,10 +28,33 @@ public class SpillableTestUtils
   public static SerdeStringSlice SERDE_STRING_SLICE = new SerdeStringSlice();
   public static SerdeListSlice<String> SERDE_STRING_LIST_SLICE = new SerdeListSlice(new SerdeStringSlice());
 
-
   private SpillableTestUtils()
   {
     //Shouldn't instantiate this
+  }
+
+  static class TestMeta extends TestWatcher
+  {
+    ManagedStateSpillableStateStore store;
+    Context.OperatorContext operatorContext;
+    String applicationPath;
+
+    @Override
+    protected void starting(Description description)
+    {
+      TestUtils.deleteTargetTestClassFolder(description);
+      store = new ManagedStateSpillableStateStore();
+      applicationPath = "target/" + description.getClassName() + "/" + description.getMethodName();
+      ((FileAccessFSImpl)store.getFileAccess()).setBasePath(applicationPath + "/" + "bucket_data");
+
+      operatorContext = ManagedStateTestUtils.getOperatorContext(1, applicationPath);
+    }
+
+    @Override
+    protected void finished(Description description)
+    {
+      TestUtils.deleteTargetTestClassFolder(description);
+    }
   }
 
   public static Slice getKeySlice(byte[] id, String key)
