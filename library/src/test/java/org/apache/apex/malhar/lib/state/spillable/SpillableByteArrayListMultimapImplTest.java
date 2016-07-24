@@ -3,6 +3,7 @@ package org.apache.apex.malhar.lib.state.spillable;
 import java.util.List;
 
 import org.junit.Assert;
+import org.junit.Rule;
 import org.junit.Test;
 
 import org.apache.apex.malhar.lib.state.spillable.inmem.InMemSpillableStateStore;
@@ -21,22 +22,42 @@ public class SpillableByteArrayListMultimapImplTest
 {
   public static final byte[] ID1 = new byte[]{(byte)0};
 
+  @Rule
+  public SpillableTestUtils.TestMeta testMeta = new SpillableTestUtils.TestMeta();
+
   @Test
   public void simpleMultiKeyTest()
   {
     InMemSpillableStateStore store = new InMemSpillableStateStore();
 
+    simpleMultiKeyTestHelper(store);
+  }
+
+  @Test
+  public void simpleMultiKeyManagedStateTest()
+  {
+    simpleMultiKeyTestHelper(testMeta.store);
+  }
+
+  public void simpleMultiKeyTestHelper(SpillableStateStore store)
+  {
     SpillableByteArrayListMultimapImpl<String, String> map =
         new SpillableByteArrayListMultimapImpl<String, String>(store, ID1, 0L, new SerdeStringSlice(),
         new SerdeStringSlice());
+
+    store.setup(testMeta.operatorContext);
+    map.setup(testMeta.operatorContext);
 
     long nextWindowId = 0L;
     nextWindowId = simpleMultiKeyTestHelper(store, map, "a", nextWindowId);
     nextWindowId = simpleMultiKeyTestHelper(store, map, "b", nextWindowId);
     simpleMultiKeyTestHelper(store, map, "c", nextWindowId);
+
+    map.teardown();
+    store.teardown();
   }
 
-  public long simpleMultiKeyTestHelper(InMemSpillableStateStore store,
+  public long simpleMultiKeyTestHelper(SpillableStateStore store,
       SpillableByteArrayListMultimapImpl<String, String> map, String key, long nextWindowId)
   {
     SerdeStringSlice serdeString = new SerdeStringSlice();
@@ -46,6 +67,7 @@ public class SpillableByteArrayListMultimapImplTest
 
     byte[] keyBytes = SliceUtils.concatenate(ID1, keySlice.toByteArray());
 
+    store.beginWindow(nextWindowId);
     map.beginWindow(nextWindowId);
     nextWindowId++;
 
@@ -72,15 +94,20 @@ public class SpillableByteArrayListMultimapImplTest
     Assert.assertEquals("g", list1.get(7));
 
     map.endWindow();
+    store.endWindow();
+    store.beforeCheckpoint(nextWindowId);
+    store.checkpointed(nextWindowId);
+    store.committed(nextWindowId);
+
+    store.beginWindow(nextWindowId);
+    map.beginWindow(nextWindowId);
+    nextWindowId++;
 
     SpillableTestUtils.checkValue(store, 0L,
         SliceUtils.concatenate(keyBytes, SpillableByteArrayListMultimapImpl.SIZE_KEY_SUFFIX), 8, 0, serdeInt);
 
     SpillableTestUtils.checkValue(store, 0L, keyBytes, 0, Lists.<String>newArrayList("a", "a", "b", "c", "d", "e",
         "f", "g"));
-
-    map.beginWindow(nextWindowId);
-    nextWindowId++;
 
     List<String> list2 = map.get(key);
 
@@ -106,15 +133,20 @@ public class SpillableByteArrayListMultimapImplTest
     Assert.assertEquals("oo", list2.get(11));
 
     map.endWindow();
+    store.endWindow();
+    store.beforeCheckpoint(nextWindowId);
+    store.checkpointed(nextWindowId);
+    store.committed(nextWindowId);
+
+    store.beginWindow(nextWindowId);
+    map.beginWindow(nextWindowId);
+    nextWindowId++;
 
     SpillableTestUtils.checkValue(store, 0L,
         SliceUtils.concatenate(keyBytes, SpillableByteArrayListMultimapImpl.SIZE_KEY_SUFFIX), 12, 0, serdeInt);
 
     SpillableTestUtils.checkValue(store, 0L, keyBytes, 0, Lists.<String>newArrayList("a", "a", "b", "c", "d", "e",
         "f", "g", "tt", "ab", "99", "oo"));
-
-    map.beginWindow(nextWindowId);
-    nextWindowId++;
 
     List<String> list3 = map.get(key);
 
@@ -137,12 +169,25 @@ public class SpillableByteArrayListMultimapImplTest
     Assert.assertEquals("444", list3.get(11));
 
     map.endWindow();
+    store.endWindow();
+    store.beforeCheckpoint(nextWindowId);
+    store.checkpointed(nextWindowId);
+    store.committed(nextWindowId);
+
+    store.beginWindow(nextWindowId);
+    map.beginWindow(nextWindowId);
 
     SpillableTestUtils.checkValue(store, 0L,
         SliceUtils.concatenate(keyBytes, SpillableByteArrayListMultimapImpl.SIZE_KEY_SUFFIX), 12, 0, serdeInt);
 
     SpillableTestUtils.checkValue(store, 0L, keyBytes, 0, Lists.<String>newArrayList("a", "111", "b", "222", "d", "333",
         "f", "g", "tt", "ab", "99", "444"));
+
+    map.endWindow();
+    store.endWindow();
+    store.beforeCheckpoint(nextWindowId);
+    store.checkpointed(nextWindowId);
+    store.committed(nextWindowId);
 
     return nextWindowId;
   }
