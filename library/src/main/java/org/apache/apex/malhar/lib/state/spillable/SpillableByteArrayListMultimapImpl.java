@@ -56,6 +56,9 @@ public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.Spill
     this.serdeValue = Preconditions.checkNotNull(serdeValue);
 
     map = new SpillableByteMapImpl(store, identifier, bucket, new PassThruByteArraySliceSerde(), new SerdeIntSlice());
+    // The above causes ClassCastException.
+    // The below fixes it but Tim said the parameter should not be changed to serdeKey. Waiting for his fix.
+    // map = new SpillableByteMapImpl(store, identifier, bucket, serdeKey, new SerdeIntSlice());
   }
 
   @Override
@@ -148,7 +151,23 @@ public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.Spill
   @Override
   public boolean containsEntry(@Nullable Object key, @Nullable Object value)
   {
-    throw new UnsupportedOperationException();
+    if (!containsKey(key)) {
+      return false;
+    }
+    List<V> values = get((K)key);
+    //TODO: linear search is inefficient
+    for (V v : values) {
+      if (value == null) {
+        if (v == null) {
+          return true;
+        }
+      } else {
+        if (value.equals(v)) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   @Override

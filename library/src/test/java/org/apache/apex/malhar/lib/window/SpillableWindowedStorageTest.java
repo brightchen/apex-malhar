@@ -20,19 +20,21 @@ package org.apache.apex.malhar.lib.window;
 
 import org.junit.Assert;
 import org.junit.Ignore;
+import org.junit.Rule;
 import org.junit.Test;
 
+import org.apache.apex.malhar.lib.state.spillable.SpillableTestUtils;
 import org.apache.apex.malhar.lib.window.impl.SpillableWindowedKeyedStorage;
 import org.apache.apex.malhar.lib.window.impl.SpillableWindowedPlainStorage;
-
-import com.datatorrent.api.Attribute;
-import com.datatorrent.lib.helper.OperatorContextTestHelper;
 
 /**
  * Unit tests for Spillable Windowed Storage
  */
 public class SpillableWindowedStorageTest
 {
+  @Rule
+  public SpillableTestUtils.TestMeta testMeta = new SpillableTestUtils.TestMeta();
+
   @Ignore
   @Test
   public void testWindowedPlainStorage()
@@ -41,8 +43,8 @@ public class SpillableWindowedStorageTest
     Window window1 = new Window.TimeWindow<>(1000, 10);
     Window window2 = new Window.TimeWindow<>(1010, 10);
     Window window3 = new Window.TimeWindow<>(1020, 10);
-
-    storage.setup(new OperatorContextTestHelper.TestIdOperatorContext(1, new Attribute.AttributeMap.DefaultAttributeMap()));
+    storage.setStore(testMeta.store);
+    storage.setup(testMeta.operatorContext);
     storage.beginApexWindow(1000);
     storage.put(window1, 1);
     storage.put(window2, 2);
@@ -63,7 +65,18 @@ public class SpillableWindowedStorageTest
     Assert.assertEquals(7L, storage.get(window2).longValue());
     Assert.assertEquals(3L, storage.get(window3).longValue());
 
+    /*
+    testMeta.simulateCrash();
+
     // simulate recovery
+    storage = new SpillableWindowedPlainStorage<>();
+    storage.setStore(testMeta.store);
+    storage.setup(testMeta.operatorContext);
+    */
+    storage.beginApexWindow(1002);
+    Assert.assertEquals(4L, storage.get(window1).longValue());
+    Assert.assertEquals(5L, storage.get(window2).longValue());
+    Assert.assertEquals(3L, storage.get(window3).longValue());
   }
 
   @Ignore
@@ -74,8 +87,8 @@ public class SpillableWindowedStorageTest
     Window window1 = new Window.TimeWindow<>(1000, 10);
     Window window2 = new Window.TimeWindow<>(1010, 10);
     Window window3 = new Window.TimeWindow<>(1020, 10);
-
-    storage.setup(new OperatorContextTestHelper.TestIdOperatorContext(2));
+    storage.setStore(testMeta.store);
+    storage.setup(testMeta.operatorContext);
     storage.beginApexWindow(1000);
     storage.put(window1, "x", 1);
     storage.put(window2, "x", 2);

@@ -419,7 +419,7 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
     }
     if (currentDerivedTimestamp == -1) {
       // TODO: once we are able to get the firstWindowMillis from Apex Core API, we can use that instead
-      currentDerivedTimestamp = ((windowId >> 32) * 1000) + (windowId & 0xffffffffL);
+      currentDerivedTimestamp = (windowId >> 32) * 1000;
     } else {
       currentDerivedTimestamp += timeIncrement;
     }

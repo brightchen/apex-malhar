@@ -33,15 +33,17 @@ public class SpillableTestUtils
     //Shouldn't instantiate this
   }
 
-  static class TestMeta extends TestWatcher
+  public static class TestMeta extends TestWatcher
   {
-    ManagedStateSpillableStateStore store;
-    Context.OperatorContext operatorContext;
-    String applicationPath;
+    public ManagedStateSpillableStateStore store;
+    public Context.OperatorContext operatorContext;
+    public String applicationPath;
+    private Description description;
 
     @Override
     protected void starting(Description description)
     {
+      //this.description = description;
       TestUtils.deleteTargetTestClassFolder(description);
       store = new ManagedStateSpillableStateStore();
       applicationPath = "target/" + description.getClassName() + "/" + description.getMethodName();
@@ -55,6 +57,15 @@ public class SpillableTestUtils
     {
       TestUtils.deleteTargetTestClassFolder(description);
     }
+
+    /*
+    public void simulateCrash()
+    {
+      store = new ManagedStateSpillableStateStore();
+      applicationPath = "target/" + description.getClassName() + "/" + description.getMethodName();
+      ((FileAccessFSImpl)store.getFileAccess()).setBasePath(applicationPath + "/" + "bucket_data");
+    }
+    */
   }
 
   public static Slice getKeySlice(byte[] id, String key)
