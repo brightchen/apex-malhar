@@ -97,7 +97,7 @@ public class SpillableByteMapImpl<K, V> implements Spillable.SpillableByteMap<K,
       return null;
     }
 
-    tempOffset.setValue(valSlice.offset + identifier.length);
+    tempOffset.setValue(valSlice.offset);
     return serdeValue.deserialize(valSlice, tempOffset);
   }
 
@@ -179,7 +179,7 @@ public class SpillableByteMapImpl<K, V> implements Spillable.SpillableByteMap<K,
     isInWindow = false;
     for (K key: cache.getChangedKeys()) {
       store.put(this.bucket, SliceUtils.concatenate(identifier, serdeKey.serialize(key)),
-          SliceUtils.concatenate(identifier, serdeValue.serialize(cache.get(key))));
+          serdeValue.serialize(cache.get(key)));
     }
 
     for (K key: cache.getRemovedKeys()) {
