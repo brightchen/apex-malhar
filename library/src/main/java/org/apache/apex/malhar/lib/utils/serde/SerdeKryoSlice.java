@@ -39,7 +39,16 @@ import com.datatorrent.netlet.util.Slice;
 @InterfaceStability.Evolving
 public class SerdeKryoSlice<T> implements Serde<T, Slice>
 {
-  private final Kryo kryo = new Kryo();
+  // Setup ThreadLocal of Kryo instances
+  private static final ThreadLocal<Kryo> kryos = new ThreadLocal<Kryo>()
+  {
+    protected Kryo initialValue() {
+      Kryo kryo = new Kryo();
+      // configure kryo instance, customize settings
+      return kryo;
+    }
+  };
+
   private final Class<? extends T> clazz;
 
   public SerdeKryoSlice()
@@ -55,6 +64,7 @@ public class SerdeKryoSlice<T> implements Serde<T, Slice>
   @Override
   public Slice serialize(T object)
   {
+    Kryo kryo = kryos.get();
     ByteArrayOutputStream stream = new ByteArrayOutputStream();
     Output output = new Output(stream);
     if (clazz == null) {
@@ -69,6 +79,7 @@ public class SerdeKryoSlice<T> implements Serde<T, Slice>
   public T deserialize(Slice slice, MutableInt offset)
   {
     byte[] bytes = slice.toByteArray();
+    Kryo kryo = kryos.get();
     Input input = new Input(bytes, offset.intValue(), bytes.length - offset.intValue());
     T object;
     if (clazz == null) {

@@ -46,15 +46,15 @@ import com.datatorrent.netlet.util.Slice;
 public class SpillableWindowedKeyedStorage<K, V> implements WindowedStorage.WindowedKeyedStorage<K, V>
 {
   private SpillableStateStore store;
-  private SpillableComplexComponentImpl sccImpl;
+  private transient SpillableComplexComponentImpl sccImpl;
   private long bucket;
   private Serde<Window, Slice> windowSerde;
   private Serde<Pair<Window, K>, Slice> windowKeyPairSerde;
   private Serde<K, Slice> keySerde;
   private Serde<V, Slice> valueSerde;
 
-  protected Spillable.SpillableByteMap<Pair<Window, K>, V> internValues;
-  protected Spillable.SpillableByteArrayListMultimap<Window, K> internKeys;
+  protected transient Spillable.SpillableByteMap<Pair<Window, K>, V> internValues;
+  protected transient Spillable.SpillableByteArrayListMultimap<Window, K> internKeys;
 
   private class KVIterator implements Iterator<Map.Entry<K, V>>
   {

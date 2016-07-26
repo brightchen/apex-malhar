@@ -57,15 +57,7 @@ public class SpillableTestUtils
     {
       TestUtils.deleteTargetTestClassFolder(description);
     }
-
-    /*
-    public void simulateCrash()
-    {
-      store = new ManagedStateSpillableStateStore();
-      applicationPath = "target/" + description.getClassName() + "/" + description.getMethodName();
-      ((FileAccessFSImpl)store.getFileAccess()).setBasePath(applicationPath + "/" + "bucket_data");
-    }
-    */
+    
   }
 
   public static Slice getKeySlice(byte[] id, String key)

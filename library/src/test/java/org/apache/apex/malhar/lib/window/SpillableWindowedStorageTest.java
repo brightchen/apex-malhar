@@ -27,6 +27,8 @@ import org.apache.apex.malhar.lib.state.spillable.SpillableTestUtils;
 import org.apache.apex.malhar.lib.window.impl.SpillableWindowedKeyedStorage;
 import org.apache.apex.malhar.lib.window.impl.SpillableWindowedPlainStorage;
 
+import com.datatorrent.lib.util.KryoCloneUtils;
+
 /**
  * Unit tests for Spillable Windowed Storage
  */
@@ -56,6 +58,9 @@ public class SpillableWindowedStorageTest
     storage.endApexWindow();
     storage.beforeCheckpoint(1001);
     storage.checkpointed(1001);
+
+    SpillableWindowedPlainStorage<Integer> clonedStorage = KryoCloneUtils.cloneObject(storage);
+
     storage.beginApexWindow(1002);
     storage.put(window1, 6);
     storage.put(window2, 7);
@@ -65,14 +70,18 @@ public class SpillableWindowedStorageTest
     Assert.assertEquals(7L, storage.get(window2).longValue());
     Assert.assertEquals(3L, storage.get(window3).longValue());
 
-    /*
-    testMeta.simulateCrash();
+    storage.beginApexWindow(1003);
+    storage.put(window1, 8);
+    storage.put(window2, 9);
+    storage.endApexWindow();
 
-    // simulate recovery
-    storage = new SpillableWindowedPlainStorage<>();
-    storage.setStore(testMeta.store);
+    // simulating crash here
+    storage.teardown();
+
+    storage = clonedStorage;
     storage.setup(testMeta.operatorContext);
-    */
+
+    // recovery at window 1002
     storage.beginApexWindow(1002);
     Assert.assertEquals(4L, storage.get(window1).longValue());
     Assert.assertEquals(5L, storage.get(window2).longValue());
