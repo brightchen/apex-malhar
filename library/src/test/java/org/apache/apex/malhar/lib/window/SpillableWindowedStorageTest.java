@@ -109,6 +109,9 @@ public class SpillableWindowedStorageTest
     storage.endApexWindow();
     storage.beforeCheckpoint(1001);
     storage.checkpointed(1001);
+
+    SpillableWindowedKeyedStorage<String, Integer> clonedStorage = KryoCloneUtils.cloneObject(storage);
+
     storage.beginApexWindow(1002);
     storage.put(window1, "x", 6);
     storage.put(window2, "x", 7);
@@ -116,6 +119,18 @@ public class SpillableWindowedStorageTest
 
     Assert.assertEquals(6L, storage.get(window1, "x").longValue());
     Assert.assertEquals(7L, storage.get(window2, "x").longValue());
+    Assert.assertEquals(3L, storage.get(window3, "x").longValue());
+
+    // simulating crash here
+    storage.teardown();
+
+    storage = clonedStorage;
+    storage.setup(testMeta.operatorContext);
+
+    // recovery at window 1002
+    storage.beginApexWindow(1002);
+    Assert.assertEquals(4L, storage.get(window1, "x").longValue());
+    Assert.assertEquals(5L, storage.get(window2, "x").longValue());
     Assert.assertEquals(3L, storage.get(window3, "x").longValue());
 
   }

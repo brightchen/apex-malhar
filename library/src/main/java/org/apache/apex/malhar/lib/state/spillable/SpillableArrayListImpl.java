@@ -11,12 +11,15 @@ import org.apache.apex.malhar.lib.utils.serde.Serde;
 import org.apache.apex.malhar.lib.utils.serde.SerdeIntSlice;
 import org.apache.apex.malhar.lib.utils.serde.SerdeListSlice;
 
+import com.esotericsoftware.kryo.DefaultSerializer;
+import com.esotericsoftware.kryo.serializers.FieldSerializer;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 import com.datatorrent.api.Context;
 import com.datatorrent.netlet.util.Slice;
 
+@DefaultSerializer(FieldSerializer.class)
 public class SpillableArrayListImpl<T> implements Spillable.SpillableArrayList<T>, Spillable.SpillableComponent
 {
   public static final int DEFAULT_BATCH_SIZE = 1000;
