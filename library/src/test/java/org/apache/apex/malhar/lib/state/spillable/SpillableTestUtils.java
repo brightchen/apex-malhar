@@ -38,12 +38,10 @@ public class SpillableTestUtils
     public ManagedStateSpillableStateStore store;
     public Context.OperatorContext operatorContext;
     public String applicationPath;
-    private Description description;
 
     @Override
     protected void starting(Description description)
     {
-      //this.description = description;
       TestUtils.deleteTargetTestClassFolder(description);
       store = new ManagedStateSpillableStateStore();
       applicationPath = "target/" + description.getClassName() + "/" + description.getMethodName();
@@ -57,7 +55,7 @@ public class SpillableTestUtils
     {
       TestUtils.deleteTargetTestClassFolder(description);
     }
-    
+
   }
 
   public static Slice getKeySlice(byte[] id, String key)
