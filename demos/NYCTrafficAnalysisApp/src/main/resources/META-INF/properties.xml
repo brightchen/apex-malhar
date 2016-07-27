@@ -20,5 +20,19 @@
     <name>dt.application.MyFirstApplication.operator.console.prop.stringFormat</name>
     <value>hello world: %s</value>
   </property>
+
+  <property>
+    <name>dt.application.NYCTrafficAnalysisApp.operator.StoreHDHT.fileStore.basePathPrefix</name>
+    <value>CS/Store</value>
+  </property>
+  <property>
+    <name>dt.application.NYCTrafficAnalysisApp.operator.StoreHDHT.embeddableQueryInfoProvider.topic</name>
+    <value>CSTopic-${dt.attr.APPLICATION_NAME}</value>
+  </property>
+  <property>
+    <name>dt.application.NYCTrafficAnalysisApp.operator.QueryResult.topic</name>
+    <value>QueryResult-${dt.attr.APPLICATION_NAME}</value>
+  </property>
+
 </configuration>
 
