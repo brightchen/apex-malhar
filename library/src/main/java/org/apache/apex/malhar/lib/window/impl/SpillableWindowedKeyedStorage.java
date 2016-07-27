@@ -193,9 +193,11 @@ public class SpillableWindowedKeyedStorage<K, V> implements WindowedStorage.Wind
       valueSerde = new SerdeKryoSlice<>();
     }
 
-    sccImpl = new SpillableComplexComponentImpl(store);
-    internValues = sccImpl.newSpillableByteMap(bucket, windowKeyPairSerde, valueSerde);
-    internKeys = sccImpl.newSpillableByteArrayListMultimap(bucket, windowSerde, keySerde);
+    if (sccImpl == null) {
+      sccImpl = new SpillableComplexComponentImpl(store);
+      internValues = sccImpl.newSpillableByteMap(bucket, windowKeyPairSerde, valueSerde);
+      internKeys = sccImpl.newSpillableByteArrayListMultimap(bucket, windowSerde, keySerde);
+    }
     sccImpl.setup(context);
   }
 

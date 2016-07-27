@@ -115,11 +115,13 @@ public class SpillableWindowedStorageTest
     storage.beginApexWindow(1002);
     storage.put(window1, "x", 6);
     storage.put(window2, "x", 7);
+    storage.put(window2, "y", 8);
     storage.endApexWindow();
 
     Assert.assertEquals(6L, storage.get(window1, "x").longValue());
     Assert.assertEquals(7L, storage.get(window2, "x").longValue());
     Assert.assertEquals(3L, storage.get(window3, "x").longValue());
+    Assert.assertEquals(8L, storage.get(window2, "y").longValue());
 
     // simulating crash here
     storage.teardown();
@@ -132,6 +134,7 @@ public class SpillableWindowedStorageTest
     Assert.assertEquals(4L, storage.get(window1, "x").longValue());
     Assert.assertEquals(5L, storage.get(window2, "x").longValue());
     Assert.assertEquals(3L, storage.get(window3, "x").longValue());
+    Assert.assertNull(storage.get(window2, "y"));
 
   }
 }
