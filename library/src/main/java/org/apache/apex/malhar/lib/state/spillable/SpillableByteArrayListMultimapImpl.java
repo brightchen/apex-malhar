@@ -136,7 +136,8 @@ public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.Spill
   @Override
   public boolean containsKey(@Nullable Object key)
   {
-    return map.containsKey(SliceUtils.concatenate(serdeKey.serialize((K)key), SIZE_KEY_SUFFIX));
+    return cache.contains((K)key) || map.containsKey(SliceUtils.concatenate(serdeKey.serialize((K)key),
+        SIZE_KEY_SUFFIX).toByteArray());
   }
 
   @Override

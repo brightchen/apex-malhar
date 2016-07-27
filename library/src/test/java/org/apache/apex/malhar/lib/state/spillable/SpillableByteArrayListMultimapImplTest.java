@@ -73,7 +73,11 @@ public class SpillableByteArrayListMultimapImplTest
 
     Assert.assertNull(map.get(key));
 
+    Assert.assertFalse(map.containsKey(key));
+
     map.put(key, "a");
+
+    Assert.assertTrue(map.containsKey(key));
 
     List<String> list1 = map.get(key);
     Assert.assertEquals(1, list1.size());
