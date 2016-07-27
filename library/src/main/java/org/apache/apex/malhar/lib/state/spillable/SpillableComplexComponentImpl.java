@@ -28,6 +28,11 @@ public class SpillableComplexComponentImpl implements SpillableComplexComponent
   @NotNull
   private SpillableIdentifierGenerator identifierGenerator;
 
+  private SpillableComplexComponentImpl()
+  {
+    // for kryo
+  }
+
   public SpillableComplexComponentImpl(SpillableStateStore store)
   {
     this(store, new SequentialSpillableIdentifierGenerator());
