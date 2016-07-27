@@ -30,7 +30,7 @@ import org.apache.hadoop.classification.InterfaceStability;
  * @param <V> The value type
  */
 @InterfaceStability.Evolving
-public interface SessionWindowedStorage<K, V> extends WindowedKeyedStorage<K, V>
+public interface SessionWindowedStorage<K, V> extends WindowedStorage.WindowedKeyedStorage<K, V>
 {
   /**
    * Given the key, the timestamp and the gap, gets the data that falls into timestamp +/- gap.

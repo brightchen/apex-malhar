@@ -1,6 +1,7 @@
 package org.apache.apex.malhar.lib.state.spillable;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -106,7 +107,8 @@ public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.Spill
   @Override
   public Collection<Map.Entry<K, V>> entries()
   {
-    throw new UnsupportedOperationException();
+    return Collections.emptyList();
+    //throw new UnsupportedOperationException();
   }
 
   @Override
@@ -136,8 +138,12 @@ public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.Spill
   @Override
   public boolean containsKey(@Nullable Object key)
   {
-    return cache.contains((K)key) || map.containsKey(SliceUtils.concatenate(serdeKey.serialize((K)key),
-        SIZE_KEY_SUFFIX).toByteArray());
+    SpillableArrayListImpl<V> list = getHelper((K)key);
+    return list != null && !list.isEmpty();
+    
+//    return cache.contains((K)key) || map.containsKey(SliceUtils.concatenate(serdeKey.serialize((K)key),
+//        SIZE_KEY_SUFFIX).toByteArray());
+//    return map.containsKey(SliceUtils.concatenate(serdeKey.serialize((K)key).toByteArray(), SIZE_KEY_SUFFIX));
   }
 
   @Override
@@ -149,7 +155,24 @@ public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.Spill
   @Override
   public boolean containsEntry(@Nullable Object key, @Nullable Object value)
   {
-    throw new UnsupportedOperationException();
+    if (!containsKey(key)) {
+      return false;
+    }
+    List<V> values = get((K)key);
+    //TODO: linear search is inefficient
+    for (int i = 0; i < values.size(); i++) {
+      V v = values.get(i);
+      if (value == null) {
+        if (v == null) {
+          return true;
+        }
+      } else {
+        if (value.equals(v)) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   @Override

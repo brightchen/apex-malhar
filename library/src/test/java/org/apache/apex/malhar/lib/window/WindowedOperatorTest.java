@@ -18,9 +18,8 @@
  */
 package org.apache.apex.malhar.lib.window;
 
-import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import javax.validation.ValidationException;
@@ -112,8 +111,8 @@ public class WindowedOperatorTest
     windowedOperator.setWindowOption(new WindowOption.TimeWindows(Duration.millis(1000)));
     windowedOperator.setAllowedLateness(Duration.millis(1000));
 
-    WindowedStorage<MutableLong> dataStorage = new InMemoryWindowedStorage<>();
-    WindowedStorage<WindowState> windowStateStorage = new InMemoryWindowedStorage<>();
+    WindowedStorage.WindowedPlainStorage<MutableLong> dataStorage = new InMemoryWindowedStorage<>();
+    WindowedStorage.WindowedPlainStorage<WindowState> windowStateStorage = new InMemoryWindowedStorage<>();
 
     windowedOperator.setDataStorage(dataStorage);
     windowedOperator.setWindowStateStorage(windowStateStorage);
@@ -285,9 +284,9 @@ public class WindowedOperatorTest
     windowedOperator.setWindowOption(new WindowOption.GlobalWindow());
     windowedOperator.setup(context);
     Tuple.WindowedTuple<Long> windowedValue = windowedOperator.getWindowedValue(new Tuple.TimestampedTuple<>(1100L, 2L));
-    List<Window> windows = windowedValue.getWindows();
+    Collection<? extends Window> windows = windowedValue.getWindows();
     Assert.assertEquals(1, windows.size());
-    Assert.assertEquals(Window.GLOBAL_WINDOW, windows.get(0));
+    Assert.assertEquals(Window.GlobalWindow.getInstance(), windows.iterator().next());
   }
 
   @Test
@@ -299,10 +298,11 @@ public class WindowedOperatorTest
     windowedOperator.setWindowOption(new WindowOption.TimeWindows(Duration.millis(1000)));
     windowedOperator.setup(context);
     Tuple.WindowedTuple<Long> windowedValue = windowedOperator.getWindowedValue(new Tuple.TimestampedTuple<>(1100L, 2L));
-    List<Window> windows = windowedValue.getWindows();
+    Collection<? extends Window> windows = windowedValue.getWindows();
     Assert.assertEquals(1, windows.size());
-    Assert.assertEquals(1000, windows.get(0).getBeginTimestamp());
-    Assert.assertEquals(1000, windows.get(0).getDurationMillis());
+    Window window = windows.iterator().next();
+    Assert.assertEquals(1000, window.getBeginTimestamp());
+    Assert.assertEquals(1000, window.getDurationMillis());
   }
 
   @Test
@@ -314,9 +314,8 @@ public class WindowedOperatorTest
     windowedOperator.setWindowOption(new WindowOption.SlidingTimeWindows(Duration.millis(1000), Duration.millis(200)));
     windowedOperator.setup(context);
     Tuple.WindowedTuple<Long> windowedValue = windowedOperator.getWindowedValue(new Tuple.TimestampedTuple<>(1600L, 2L));
-    List<Window> windows = windowedValue.getWindows();
+    Collection<? extends Window> windows = windowedValue.getWindows();
     Window[] winArray = windows.toArray(new Window[]{});
-    Arrays.sort(winArray, Window.DEFAULT_COMPARATOR);
     Assert.assertEquals(5, winArray.length);
     Assert.assertEquals(800, winArray[0].getBeginTimestamp());
     Assert.assertEquals(1000, winArray[0].getDurationMillis());
@@ -348,7 +347,7 @@ public class WindowedOperatorTest
     Assert.assertEquals(1, sink.getCount(false));
     Tuple.WindowedTuple<KeyValPair<String, Long>> out = (Tuple.WindowedTuple<KeyValPair<String, Long>>)sink.collectedTuples.get(0);
     Assert.assertEquals(1, out.getWindows().size());
-    Window.SessionWindow<String> window1 = (Window.SessionWindow<String>)out.getWindows().get(0);
+    Window.SessionWindow<String> window1 = (Window.SessionWindow<String>)out.getWindows().iterator().next();
     Assert.assertEquals(1100L, window1.getBeginTimestamp());
     Assert.assertEquals(1, window1.getDurationMillis());
     Assert.assertEquals("a", window1.getKey());
@@ -364,13 +363,13 @@ public class WindowedOperatorTest
     // retraction trigger
     out = (Tuple.WindowedTuple<KeyValPair<String, Long>>)sink.collectedTuples.get(0);
     Assert.assertEquals(1, out.getWindows().size());
-    Assert.assertEquals(window1, out.getWindows().get(0));
+    Assert.assertEquals(window1, out.getWindows().iterator().next());
     Assert.assertEquals("a", out.getValue().getKey());
     Assert.assertEquals(-2L, out.getValue().getValue().longValue());
 
     // normal trigger
     out = (Tuple.WindowedTuple<KeyValPair<String, Long>>)sink.collectedTuples.get(1);
-    Window.SessionWindow<String> window2 = (Window.SessionWindow<String>)out.getWindows().get(0);
+    Window.SessionWindow<String> window2 = (Window.SessionWindow<String>)out.getWindows().iterator().next();
 
     Assert.assertEquals(1100L, window2.getBeginTimestamp());
     Assert.assertEquals(901, window2.getDurationMillis());
@@ -384,7 +383,7 @@ public class WindowedOperatorTest
     Assert.assertEquals(1, sink.getCount(false));
     out = (Tuple.WindowedTuple<KeyValPair<String, Long>>)sink.collectedTuples.get(0);
     Assert.assertEquals(1, out.getWindows().size());
-    Window.SessionWindow<String> window3 = (Window.SessionWindow<String>)out.getWindows().get(0);
+    Window.SessionWindow<String> window3 = (Window.SessionWindow<String>)out.getWindows().iterator().next();
     Assert.assertEquals(5000L, window3.getBeginTimestamp());
     Assert.assertEquals(1, window3.getDurationMillis());
     Assert.assertEquals("a", out.getValue().getKey());
@@ -400,19 +399,19 @@ public class WindowedOperatorTest
     // retraction of the two old windows
     out = (Tuple.WindowedTuple<KeyValPair<String, Long>>)sink.collectedTuples.get(0);
     Assert.assertEquals(1, out.getWindows().size());
-    Assert.assertEquals(window2, out.getWindows().get(0));
+    Assert.assertEquals(window2, out.getWindows().iterator().next());
     Assert.assertEquals("a", out.getValue().getKey());
     Assert.assertEquals(-5L, out.getValue().getValue().longValue());
     out = (Tuple.WindowedTuple<KeyValPair<String, Long>>)sink.collectedTuples.get(1);
     Assert.assertEquals(1, out.getWindows().size());
-    Assert.assertEquals(window3, out.getWindows().get(0));
+    Assert.assertEquals(window3, out.getWindows().iterator().next());
     Assert.assertEquals("a", out.getValue().getKey());
     Assert.assertEquals(-4L, out.getValue().getValue().longValue());
 
     // normal trigger
     out = (Tuple.WindowedTuple<KeyValPair<String, Long>>)sink.collectedTuples.get(2);
     Assert.assertEquals(1, out.getWindows().size());
-    Window.SessionWindow<String> window4 = (Window.SessionWindow<String>)out.getWindows().get(0);
+    Window.SessionWindow<String> window4 = (Window.SessionWindow<String>)out.getWindows().iterator().next();
     Assert.assertEquals(1100L, window4.getBeginTimestamp());
     Assert.assertEquals(3901, window4.getDurationMillis());
     Assert.assertEquals("a", out.getValue().getKey());
@@ -428,7 +427,7 @@ public class WindowedOperatorTest
         new Attribute.AttributeMap.DefaultAttributeMap());
     KeyedWindowedOperatorImpl<String, Long, MutableLong, Long> windowedOperator = createDefaultKeyedWindowedOperator();
     windowedOperator.setWindowOption(new WindowOption.TimeWindows(Duration.millis(1000)));
-    WindowedKeyedStorage<String, MutableLong> dataStorage = new InMemoryWindowedKeyedStorage<>();
+    WindowedStorage.WindowedKeyedStorage<String, MutableLong> dataStorage = new InMemoryWindowedKeyedStorage<>();
     windowedOperator.setDataStorage(dataStorage);
     windowedOperator.setup(context);
     windowedOperator.beginWindow(1);
