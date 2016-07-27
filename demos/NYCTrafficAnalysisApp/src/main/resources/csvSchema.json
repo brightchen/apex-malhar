@@ -1,0 +1,22 @@
+{
+  "separator": ",",
+  "quoteChar":"\"",
+  "fields": [
+    {
+      "name": "Pickup",
+      "type": "String"
+    },
+    {
+      "name": "Dropoff",
+      "type": "String"
+    },
+    {
+      "name": "Cartype",
+      "type": "String"
+    },
+    {
+      "name": "Fare",
+      "type": "INTEGER"
+    }
+  ]
+}
