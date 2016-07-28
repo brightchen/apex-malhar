@@ -34,7 +34,7 @@ public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.Spill
 
   private int batchSize = DEFAULT_BATCH_SIZE;
 
-  private WindowBoundedMapCache<K, SpillableArrayListImpl<V>> cache = new WindowBoundedMapCache<>();
+  private transient WindowBoundedMapCache<K, SpillableArrayListImpl<V>> cache = new WindowBoundedMapCache<>();
 
   @NotNull
   private SpillableByteMapImpl<byte[], Integer> map;
