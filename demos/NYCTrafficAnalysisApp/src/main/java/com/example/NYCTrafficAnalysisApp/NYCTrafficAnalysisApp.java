@@ -50,6 +50,36 @@ public class NYCTrafficAnalysisApp implements StreamingApplication
     PROP_STORE_PATH = "dt.application." + appName + ".operator.StoreHDHT.fileStore.basePathPrefix";
   }
 
+  //@Override
+  public void populateDAG1(DAG dag, Configuration conf)
+  {
+    String csvSchema = SchemaUtils.jarResourceFileToString("csvSchema.json");
+    
+    LineByLineFileInputOperator reader = dag.addOperator("Reader",  LineByLineFileInputOperator.class);
+    reader.setDirectory("/user/aayushi/testfiles");
+    
+    CsvParser parser = dag.addOperator("Parser", CsvParser.class);
+    parser.setSchema(csvSchema);
+    DimensionsComputationFlexibleSingleSchemaPOJO dimensions = dag.addOperator("DimensionsComputation", DimensionsComputationFlexibleSingleSchemaPOJO.class);
+    
+    AppDataSingleSchemaDimensionStoreHDHT store = dag.addOperator("StoreHDHT", AppDataSingleSchemaDimensionStoreHDHT.class);
+    PubSubWebSocketAppDataResult queryResult = createAppDataResult();
+    
+    dag.addStream("FileInputToParser", reader.output, parser.in);
+    
+    ConsoleOutputOperator consoleOutput = dag.addOperator("Console", ConsoleOutputOperator.class);
+    dag.setOutputPortAttribute(parser.out, Context.PortContext.TUPLE_CLASS, POJOobject.class);
+    dag.setInputPortAttribute(consoleOutput.input, Context.PortContext.TUPLE_CLASS, POJOobject.class);
+    
+//    dag.addStream("ParserToDC", parser.out, consoleOutput.input);
+//    dag.addStream("ParserToDC", parser.out, dimensions.input);
+//    dag.addStream("ParserToDC-error", parser.err, );
+    dag.addStream("ParserToDC", parser.out, dimensions.input);
+    dag.addStream("DimensionalStreamToStore", dimensions.output, store.input);
+    dag.addStream("QueryResult", store.queryResult, queryResult.input);
+
+  }
+  
   @Override
   public void populateDAG(DAG dag, Configuration conf)
   {
@@ -58,7 +88,7 @@ public class NYCTrafficAnalysisApp implements StreamingApplication
 
       LineByLineFileInputOperator reader = dag.addOperator("Reader",  LineByLineFileInputOperator.class);
       CsvParser parser = dag.addOperator("Parser", CsvParser.class);
-      ConsoleOutputOperator consoleOutput = dag.addOperator("Console", ConsoleOutputOperator.class);
+      //ConsoleOutputOperator consoleOutput = dag.addOperator("Console", ConsoleOutputOperator.class);
       DimensionsComputationFlexibleSingleSchemaPOJO dimensions = dag.addOperator("DimensionsComputation", DimensionsComputationFlexibleSingleSchemaPOJO.class);
       AppDataSingleSchemaDimensionStoreHDHT store = dag.addOperator("StoreHDHT", AppDataSingleSchemaDimensionStoreHDHT.class);
       //PubSubWebSocketAppDataQuery query = dag.addOperator("Query", PubSubWebSocketAppDataQuery.class);
