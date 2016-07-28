@@ -14,6 +14,8 @@ import org.apache.apex.malhar.lib.utils.serde.Serde;
 import org.apache.apex.malhar.lib.utils.serde.SerdeIntSlice;
 import org.apache.apex.malhar.lib.utils.serde.SliceUtils;
 
+import com.esotericsoftware.kryo.DefaultSerializer;
+import com.esotericsoftware.kryo.serializers.FieldSerializer;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multiset;
@@ -24,6 +26,7 @@ import com.datatorrent.netlet.util.Slice;
 /**
  * Created by tfarkas on 6/12/16.
  */
+@DefaultSerializer(FieldSerializer.class)
 public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.SpillableByteArrayListMultimap<K, V>,
     Spillable.SpillableComponent
 {
@@ -32,7 +35,7 @@ public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.Spill
 
   private int batchSize = DEFAULT_BATCH_SIZE;
 
-  private WindowBoundedMapCache<K, SpillableArrayListImpl<V>> cache = new WindowBoundedMapCache<>();
+  private transient WindowBoundedMapCache<K, SpillableArrayListImpl<V>> cache = new WindowBoundedMapCache<>();
 
   @NotNull
   private SpillableByteMapImpl<byte[], Integer> map;
@@ -45,6 +48,11 @@ public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.Spill
 
   private boolean isRunning = false;
   private boolean isInWindow = false;
+
+  private SpillableByteArrayListMultimapImpl()
+  {
+    // for kryo
+  }
 
   public SpillableByteArrayListMultimapImpl(SpillableStateStore store, byte[] identifier, long bucket,
       Serde<K, Slice> serdeKey,

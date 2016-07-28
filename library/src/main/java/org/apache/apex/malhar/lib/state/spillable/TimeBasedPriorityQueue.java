@@ -60,6 +60,11 @@ public class TimeBasedPriorityQueue<T>
     private T key;
     private long timestamp;
 
+    private TimeWrapper()
+    {
+      // for kryo
+    }
+
     public TimeWrapper(T key, long timestamp)
     {
       this.key = Preconditions.checkNotNull(key);

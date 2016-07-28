@@ -13,6 +13,7 @@ import org.apache.apex.malhar.lib.utils.serde.SerdeStringSlice;
 
 import com.datatorrent.api.Context;
 import com.datatorrent.lib.fileaccess.FileAccessFSImpl;
+import com.datatorrent.lib.util.KryoCloneUtils;
 import com.datatorrent.lib.util.TestUtils;
 
 /**
@@ -396,5 +397,61 @@ public class SpillableByteMapImplTest
     map1.teardown();
     map2.teardown();
     store.teardown();
+  }
+
+  @Test
+  public void recoveryTest()
+  {
+    SerdeStringSlice sss = new SerdeStringSlice();
+
+    SpillableByteMapImpl<String, String> map1 = new SpillableByteMapImpl<>(testMeta.store, ID1, 0L,
+        new SerdeStringSlice(),
+        new SerdeStringSlice());
+
+    testMeta.store.setup(testMeta.operatorContext);
+    map1.setup(testMeta.operatorContext);
+
+    map1.beginWindow(1000);
+    map1.put("x", "1");
+    map1.put("y", "2");
+    map1.put("z", "3");
+    map1.endWindow();
+    map1.beginWindow(1001);
+    map1.put("x", "4");
+    map1.put("y", "5");
+    map1.endWindow();
+
+    testMeta.store.beforeCheckpoint(1001);
+    testMeta.store.checkpointed(1001);
+
+    SpillableByteMapImpl<String, String> clonedMap1 = KryoCloneUtils.cloneObject(map1);
+
+    map1.beginWindow(1002);
+    map1.put("x", "6");
+    map1.put("y", "7");
+    map1.endWindow();
+
+    Assert.assertEquals("6", map1.get("x"));
+    Assert.assertEquals("7", map1.get("y"));
+    Assert.assertEquals("3", map1.get("z"));
+
+    map1.beginWindow(1003);
+    map1.put("x", "8");
+    map1.put("y", "9");
+    map1.endWindow();
+
+    // simulating crash here
+    map1.teardown();
+    testMeta.store.teardown();
+
+    map1 = clonedMap1;
+    map1.getStore().setup(testMeta.operatorContext);
+    map1.setup(testMeta.operatorContext);
+
+    // recovery at window 1002
+    map1.beginWindow(1002);
+    Assert.assertEquals("4", map1.get("x"));
+    Assert.assertEquals("5", map1.get("y"));
+    Assert.assertEquals("3", map1.get("z"));
   }
 }

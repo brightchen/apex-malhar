@@ -20,6 +20,11 @@ public class SerdeListSlice<T> implements Serde<List<T>, Slice>
   @NotNull
   private Serde<T, Slice> serde;
 
+  private SerdeListSlice()
+  {
+    // for kryo
+  }
+
   public SerdeListSlice(@NotNull Serde<T, Slice> serde)
   {
     this.serde = Preconditions.checkNotNull(serde);
