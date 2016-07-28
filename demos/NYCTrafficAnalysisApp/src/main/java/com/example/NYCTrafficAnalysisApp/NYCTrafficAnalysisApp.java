@@ -28,37 +28,32 @@ import com.datatorrent.contrib.dimensions.AppDataSingleSchemaDimensionStoreHDHT;
 import com.datatorrent.lib.io.PubSubWebSocketAppDataQuery;
 import com.datatorrent.lib.io.PubSubWebSocketAppDataResult;
 
-@ApplicationAnnotation(name = NYCTrafficAnalysisApp.APP_NAME)
+@ApplicationAnnotation(name = "NYCTrafficAnalysisApp")
 public class NYCTrafficAnalysisApp implements StreamingApplication
 {
   private static final transient Logger logger = LoggerFactory.getLogger(NYCTrafficAnalysisApp.class);
 
-  public static final String APP_NAME = "NYCTrafficAnalysisApp";
-
-  public final String appName;
+  public String appName = "NYCTrafficAnalysisApp";
 
   protected String PROP_STORE_PATH;
 
-  public NYCTrafficAnalysisApp()
-  {
-    this(APP_NAME);
-  }
 
-  public NYCTrafficAnalysisApp(String appName)
-  {
-    this.appName = appName;
-    PROP_STORE_PATH = "dt.application." + appName + ".operator.StoreHDHT.fileStore.basePathPrefix";
-  }
+//  public NYCTrafficAnalysisApp(String appName)
+//  {
+//    this.appName = appName;
+//    PROP_STORE_PATH = "dt.application." + appName + ".operator.StoreHDHT.fileStore.basePathPrefix";
+//  }
 
   @Override
   public void populateDAG(DAG dag, Configuration conf)
   {
+    PROP_STORE_PATH = "dt.application." + appName + ".operator.StoreHDHT.fileStore.basePathPrefix";
       String csvSchema = SchemaUtils.jarResourceFileToString("csvSchema.json");
       String dcSchema = SchemaUtils.jarResourceFileToString("dcSchema.json");
 
       LineByLineFileInputOperator reader = dag.addOperator("Reader",  LineByLineFileInputOperator.class);
       CsvParser parser = dag.addOperator("Parser", CsvParser.class);
-      ConsoleOutputOperator consoleOutput = dag.addOperator("Console", ConsoleOutputOperator.class);
+      //ConsoleOutputOperator consoleOutput = dag.addOperator("Console", ConsoleOutputOperator.class);
       DimensionsComputationFlexibleSingleSchemaPOJO dimensions = dag.addOperator("DimensionsComputation", DimensionsComputationFlexibleSingleSchemaPOJO.class);
       AppDataSingleSchemaDimensionStoreHDHT store = dag.addOperator("StoreHDHT", AppDataSingleSchemaDimensionStoreHDHT.class);
       //PubSubWebSocketAppDataQuery query = dag.addOperator("Query", PubSubWebSocketAppDataQuery.class);

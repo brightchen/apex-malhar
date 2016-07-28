@@ -27,11 +27,11 @@
   </property>
   <property>
     <name>dt.application.NYCTrafficAnalysisApp.operator.StoreHDHT.embeddableQueryInfoProvider.topic</name>
-    <value>CSTopic-${dt.attr.APPLICATION_NAME}</value>
+    <value>Topic</value>
   </property>
   <property>
     <name>dt.application.NYCTrafficAnalysisApp.operator.QueryResult.topic</name>
-    <value>QueryResult-${dt.attr.APPLICATION_NAME}</value>
+    <value>QueryResult</value>
   </property>
 
 </configuration>
