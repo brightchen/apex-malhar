@@ -55,6 +55,11 @@ public class SpillableByteMapImpl<K, V> implements Spillable.SpillableByteMap<K,
     this.serdeValue = Preconditions.checkNotNull(serdeValue);
   }
 
+  public SpillableStateStore getStore()
+  {
+    return this.store;
+  }
+
   @Override
   public int size()
   {
