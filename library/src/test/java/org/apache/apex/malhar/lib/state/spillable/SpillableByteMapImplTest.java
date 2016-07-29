@@ -3,18 +3,15 @@ package org.apache.apex.malhar.lib.state.spillable;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.TestWatcher;
-import org.junit.runner.Description;
 
-import org.apache.apex.malhar.lib.state.managed.ManagedStateTestUtils;
 import org.apache.apex.malhar.lib.state.spillable.inmem.InMemSpillableStateStore;
-import org.apache.apex.malhar.lib.state.spillable.managed.ManagedStateSpillableStateStore;
 import org.apache.apex.malhar.lib.utils.serde.SerdeStringSlice;
 
+import com.esotericsoftware.kryo.Kryo;
+
 import com.datatorrent.api.Context;
-import com.datatorrent.lib.fileaccess.FileAccessFSImpl;
 import com.datatorrent.lib.util.KryoCloneUtils;
-import com.datatorrent.lib.util.TestUtils;
+import com.datatorrent.netlet.util.Slice;
 
 /**
  * Created by tfarkas on 6/6/16.
@@ -400,7 +397,41 @@ public class SpillableByteMapImplTest
   }
 
   @Test
-  public void recoveryTest()
+  public void managedStateTest()
+  {
+    testMeta.store.setup(testMeta.operatorContext);
+
+    testMeta.store.beginWindow(0L);
+    testMeta.store.put(0, new Slice(new byte[]{0, 0}), new Slice(new byte[]{10, 10}));
+    testMeta.store.endWindow();
+
+    testMeta.store.beginWindow(1L);
+    testMeta.store.put(0, new Slice(new byte[]{0, 0}), new Slice(new byte[]{10, 11}));
+    testMeta.store.endWindow();
+    testMeta.store.beforeCheckpoint(1L);
+    testMeta.store.checkpointed(1L);
+
+    SpillableStateStore store = KryoCloneUtils.cloneObject(new Kryo(), testMeta.store);
+
+    testMeta.store.beginWindow(2L);
+    testMeta.store.put(0, new Slice(new byte[]{0, 0}), new Slice(new byte[]{10, 12}));
+    testMeta.store.endWindow();
+
+    testMeta.store.teardown();
+
+    store.setup(testMeta.operatorContext);
+
+    store.beginWindow(2);
+
+    Assert.assertEquals(new Slice(new byte[]{10, 11}), testMeta.store.getSync(0L, new Slice(new byte[]{0, 0})));
+
+    store.endWindow();
+
+    store.teardown();
+  }
+
+  @Test
+  public void recoveryTest() throws Exception
   {
     SerdeStringSlice sss = new SerdeStringSlice();
 
@@ -411,45 +442,48 @@ public class SpillableByteMapImplTest
     testMeta.store.setup(testMeta.operatorContext);
     map1.setup(testMeta.operatorContext);
 
-    map1.beginWindow(1000);
+    System.out.println("0");
+    testMeta.store.beginWindow(0);
+    map1.beginWindow(0);
     map1.put("x", "1");
     map1.put("y", "2");
     map1.put("z", "3");
     map1.endWindow();
-    map1.beginWindow(1001);
+
+    testMeta.store.endWindow();
+
+    System.out.println("1");
+    testMeta.store.beginWindow(1);
+    map1.beginWindow(1);
     map1.put("x", "4");
     map1.put("y", "5");
     map1.endWindow();
-
-    testMeta.store.beforeCheckpoint(1001);
-    testMeta.store.checkpointed(1001);
-
+    testMeta.store.endWindow();
+    testMeta.store.beforeCheckpoint(1);
     SpillableByteMapImpl<String, String> clonedMap1 = KryoCloneUtils.cloneObject(map1);
+    testMeta.store.checkpointed(1);
 
-    map1.beginWindow(1002);
-    map1.put("x", "6");
-    map1.put("y", "7");
+    System.out.println("2");
+    testMeta.store.beginWindow(2);
+    map1.beginWindow(2);
+    map1.put("x1", "6");
+    map1.put("y1", "7");
     map1.endWindow();
-
-    Assert.assertEquals("6", map1.get("x"));
-    Assert.assertEquals("7", map1.get("y"));
-    Assert.assertEquals("3", map1.get("z"));
-
-    map1.beginWindow(1003);
-    map1.put("x", "8");
-    map1.put("y", "9");
-    map1.endWindow();
-
+    testMeta.store.endWindow();
     // simulating crash here
     map1.teardown();
     testMeta.store.teardown();
 
+    System.out.println("Recovering");
+
     map1 = clonedMap1;
+    testMeta.operatorContext.getAttributes().put(Context.OperatorContext.ACTIVATION_WINDOW_ID, 1L);
     map1.getStore().setup(testMeta.operatorContext);
     map1.setup(testMeta.operatorContext);
 
     // recovery at window 1002
-    map1.beginWindow(1002);
+    map1.getStore().beginWindow(2);
+    map1.beginWindow(2);
     Assert.assertEquals("4", map1.get("x"));
     Assert.assertEquals("5", map1.get("y"));
     Assert.assertEquals("3", map1.get("z"));

@@ -1,5 +1,6 @@
 package org.apache.apex.malhar.lib.state.spillable;
 
+import java.io.Serializable;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
@@ -20,7 +21,8 @@ import com.datatorrent.api.Context;
 import com.datatorrent.netlet.util.Slice;
 
 @DefaultSerializer(FieldSerializer.class)
-public class SpillableByteMapImpl<K, V> implements Spillable.SpillableByteMap<K, V>, Spillable.SpillableComponent
+public class SpillableByteMapImpl<K, V> implements Spillable.SpillableByteMap<K, V>, Spillable.SpillableComponent,
+    Serializable
 {
   @NotNull
   private SpillableStateStore store;
@@ -99,12 +101,18 @@ public class SpillableByteMapImpl<K, V> implements Spillable.SpillableByteMap<K,
       return val;
     }
 
+    System.out.println("Getting key " + bucket + " " + SliceUtils.concatenate(identifier, serdeKey.serialize(key)));
     Slice valSlice = store.getSync(bucket, SliceUtils.concatenate(identifier, serdeKey.serialize(key)));
+
+    if (valSlice == BucketedState.EXPIRED) {
+      System.out.println("Expired " + key);
+    }
 
     if (valSlice == null || valSlice == BucketedState.EXPIRED || valSlice.length == 0) {
       return null;
     }
 
+    System.out.println("valSlice " + valSlice);
     tempOffset.setValue(valSlice.offset);
     return serdeValue.deserialize(valSlice, tempOffset);
   }
@@ -186,6 +194,7 @@ public class SpillableByteMapImpl<K, V> implements Spillable.SpillableByteMap<K,
   {
     isInWindow = false;
     for (K key: cache.getChangedKeys()) {
+      System.out.println("Putting key " + bucket + " " + SliceUtils.concatenate(identifier, serdeKey.serialize(key)));
       store.put(this.bucket, SliceUtils.concatenate(identifier, serdeKey.serialize(key)),
           serdeValue.serialize(cache.get(key)));
     }
