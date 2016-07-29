@@ -27,6 +27,7 @@ import org.apache.apex.malhar.lib.state.spillable.SpillableTestUtils;
 import org.apache.apex.malhar.lib.window.impl.SpillableWindowedKeyedStorage;
 import org.apache.apex.malhar.lib.window.impl.SpillableWindowedPlainStorage;
 
+import com.datatorrent.api.Context;
 import com.datatorrent.lib.util.KryoCloneUtils;
 
 /**
@@ -57,9 +58,9 @@ public class SpillableWindowedStorageTest
     storage.put(window2, 5);
     storage.endApexWindow();
     storage.beforeCheckpoint(1001);
+    SpillableWindowedPlainStorage<Integer> clonedStorage = KryoCloneUtils.cloneObject(storage);
     storage.checkpointed(1001);
 
-    SpillableWindowedPlainStorage<Integer> clonedStorage = KryoCloneUtils.cloneObject(storage);
 
     storage.beginApexWindow(1002);
     storage.put(window1, 6);
@@ -79,6 +80,7 @@ public class SpillableWindowedStorageTest
     storage.teardown();
 
     storage = clonedStorage;
+    testMeta.operatorContext.getAttributes().put(Context.OperatorContext.ACTIVATION_WINDOW_ID, 1001L);
     storage.setup(testMeta.operatorContext);
 
     // recovery at window 1002
@@ -108,9 +110,9 @@ public class SpillableWindowedStorageTest
     storage.put(window2, "x", 5);
     storage.endApexWindow();
     storage.beforeCheckpoint(1001);
+    SpillableWindowedKeyedStorage<String, Integer> clonedStorage = KryoCloneUtils.cloneObject(storage);
     storage.checkpointed(1001);
 
-    SpillableWindowedKeyedStorage<String, Integer> clonedStorage = KryoCloneUtils.cloneObject(storage);
 
     storage.beginApexWindow(1002);
     storage.put(window1, "x", 6);
@@ -127,6 +129,7 @@ public class SpillableWindowedStorageTest
     storage.teardown();
 
     storage = clonedStorage;
+    testMeta.operatorContext.getAttributes().put(Context.OperatorContext.ACTIVATION_WINDOW_ID, 1001L);
     storage.setup(testMeta.operatorContext);
 
     // recovery at window 1002
