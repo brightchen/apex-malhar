@@ -1,5 +1,6 @@
 package org.apache.apex.malhar.lib.state.spillable;
 
+import java.io.Serializable;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
@@ -12,12 +13,16 @@ import org.apache.apex.malhar.lib.utils.serde.SliceUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.mutable.MutableInt;
 
+import com.esotericsoftware.kryo.DefaultSerializer;
+import com.esotericsoftware.kryo.serializers.FieldSerializer;
 import com.google.common.base.Preconditions;
 
 import com.datatorrent.api.Context;
 import com.datatorrent.netlet.util.Slice;
 
-public class SpillableByteMapImpl<K, V> implements Spillable.SpillableByteMap<K, V>, Spillable.SpillableComponent
+@DefaultSerializer(FieldSerializer.class)
+public class SpillableByteMapImpl<K, V> implements Spillable.SpillableByteMap<K, V>, Spillable.SpillableComponent,
+    Serializable
 {
   @NotNull
   private SpillableStateStore store;
@@ -96,12 +101,18 @@ public class SpillableByteMapImpl<K, V> implements Spillable.SpillableByteMap<K,
       return val;
     }
 
+    System.out.println("Getting key " + bucket + " " + SliceUtils.concatenate(identifier, serdeKey.serialize(key)));
     Slice valSlice = store.getSync(bucket, SliceUtils.concatenate(identifier, serdeKey.serialize(key)));
+
+    if (valSlice == BucketedState.EXPIRED) {
+      System.out.println("Expired " + key);
+    }
 
     if (valSlice == null || valSlice == BucketedState.EXPIRED || valSlice.length == 0) {
       return null;
     }
 
+    System.out.println("valSlice " + valSlice);
     tempOffset.setValue(valSlice.offset);
     return serdeValue.deserialize(valSlice, tempOffset);
   }
@@ -183,6 +194,7 @@ public class SpillableByteMapImpl<K, V> implements Spillable.SpillableByteMap<K,
   {
     isInWindow = false;
     for (K key: cache.getChangedKeys()) {
+      System.out.println("Putting key " + bucket + " " + SliceUtils.concatenate(identifier, serdeKey.serialize(key)));
       store.put(this.bucket, SliceUtils.concatenate(identifier, serdeKey.serialize(key)),
           serdeValue.serialize(cache.get(key)));
     }
