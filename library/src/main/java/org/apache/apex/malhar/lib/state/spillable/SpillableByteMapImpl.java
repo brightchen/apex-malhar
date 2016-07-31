@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.apex.malhar.lib.state.spillable;
 
 import java.io.Serializable;
@@ -24,6 +42,11 @@ import com.datatorrent.netlet.util.Slice;
 public class SpillableByteMapImpl<K, V> implements Spillable.SpillableByteMap<K, V>, Spillable.SpillableComponent,
     Serializable
 {
+  private transient WindowBoundedMapCache<K, V> cache = new WindowBoundedMapCache<>();
+  private transient MutableInt tempOffset = new MutableInt();
+  private transient boolean isRunning = false;
+  private transient boolean isInWindow = false;
+
   @NotNull
   private SpillableStateStore store;
   @NotNull
@@ -35,12 +58,6 @@ public class SpillableByteMapImpl<K, V> implements Spillable.SpillableByteMap<K,
   private Serde<V, Slice> serdeValue;
 
   private int size = 0;
-
-  private transient WindowBoundedMapCache<K, V> cache = new WindowBoundedMapCache<>();
-  private transient MutableInt tempOffset = new MutableInt();
-
-  private boolean isRunning = false;
-  private boolean isInWindow = false;
 
   private SpillableByteMapImpl()
   {
@@ -101,18 +118,12 @@ public class SpillableByteMapImpl<K, V> implements Spillable.SpillableByteMap<K,
       return val;
     }
 
-    System.out.println("Getting key " + bucket + " " + SliceUtils.concatenate(identifier, serdeKey.serialize(key)));
     Slice valSlice = store.getSync(bucket, SliceUtils.concatenate(identifier, serdeKey.serialize(key)));
-
-    if (valSlice == BucketedState.EXPIRED) {
-      System.out.println("Expired " + key);
-    }
 
     if (valSlice == null || valSlice == BucketedState.EXPIRED || valSlice.length == 0) {
       return null;
     }
 
-    System.out.println("valSlice " + valSlice);
     tempOffset.setValue(valSlice.offset);
     return serdeValue.deserialize(valSlice, tempOffset);
   }
@@ -194,7 +205,6 @@ public class SpillableByteMapImpl<K, V> implements Spillable.SpillableByteMap<K,
   {
     isInWindow = false;
     for (K key: cache.getChangedKeys()) {
-      System.out.println("Putting key " + bucket + " " + SliceUtils.concatenate(identifier, serdeKey.serialize(key)));
       store.put(this.bucket, SliceUtils.concatenate(identifier, serdeKey.serialize(key)),
           serdeValue.serialize(cache.get(key)));
     }

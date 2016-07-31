@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.apex.malhar.lib.state.spillable;
 
 import java.util.List;
@@ -13,6 +31,11 @@ import org.apache.apex.malhar.lib.utils.serde.SliceUtils;
 
 import com.google.common.collect.Lists;
 
+import com.datatorrent.api.Attribute;
+import com.datatorrent.api.Context;
+import com.datatorrent.api.DAG;
+import com.datatorrent.lib.helper.OperatorContextTestHelper;
+import com.datatorrent.lib.util.KryoCloneUtils;
 import com.datatorrent.netlet.util.Slice;
 
 /**
@@ -50,6 +73,7 @@ public class SpillableByteArrayListMultimapImplTest
 
     long nextWindowId = 0L;
     nextWindowId = simpleMultiKeyTestHelper(store, map, "a", nextWindowId);
+    nextWindowId++;
     nextWindowId = simpleMultiKeyTestHelper(store, map, "b", nextWindowId);
     simpleMultiKeyTestHelper(store, map, "c", nextWindowId);
 
@@ -99,9 +123,6 @@ public class SpillableByteArrayListMultimapImplTest
 
     map.endWindow();
     store.endWindow();
-    store.beforeCheckpoint(nextWindowId);
-    store.checkpointed(nextWindowId);
-    store.committed(nextWindowId);
 
     store.beginWindow(nextWindowId);
     map.beginWindow(nextWindowId);
@@ -136,15 +157,16 @@ public class SpillableByteArrayListMultimapImplTest
     Assert.assertEquals("99", list2.get(10));
     Assert.assertEquals("oo", list2.get(11));
 
+    Assert.assertEquals(12, list2.size());
+
     map.endWindow();
     store.endWindow();
-    store.beforeCheckpoint(nextWindowId);
-    store.checkpointed(nextWindowId);
-    store.committed(nextWindowId);
 
     store.beginWindow(nextWindowId);
     map.beginWindow(nextWindowId);
     nextWindowId++;
+
+    Assert.assertEquals(12, list2.size());
 
     SpillableTestUtils.checkValue(store, 0L,
         SliceUtils.concatenate(keyBytes, SpillableByteArrayListMultimapImpl.SIZE_KEY_SUFFIX), 12, 0, serdeInt);
@@ -172,11 +194,10 @@ public class SpillableByteArrayListMultimapImplTest
     Assert.assertEquals("99", list3.get(10));
     Assert.assertEquals("444", list3.get(11));
 
+    Assert.assertEquals(12, list2.size());
+
     map.endWindow();
     store.endWindow();
-    store.beforeCheckpoint(nextWindowId);
-    store.checkpointed(nextWindowId);
-    store.committed(nextWindowId);
 
     store.beginWindow(nextWindowId);
     map.beginWindow(nextWindowId);
@@ -190,9 +211,101 @@ public class SpillableByteArrayListMultimapImplTest
     map.endWindow();
     store.endWindow();
     store.beforeCheckpoint(nextWindowId);
-    store.checkpointed(nextWindowId);
-    store.committed(nextWindowId);
 
     return nextWindowId;
   }
+
+  @Test
+  public void recoveryTestWithManagedState()
+  {
+    SpillableStateStore store = testMeta.store;
+
+    SpillableByteArrayListMultimapImpl<String, String> map =
+        new SpillableByteArrayListMultimapImpl<>(store, ID1, 0L, new SerdeStringSlice(), new SerdeStringSlice());
+
+    store.setup(testMeta.operatorContext);
+    map.setup(testMeta.operatorContext);
+
+    long nextWindowId = 0L;
+    nextWindowId = simpleMultiKeyTestHelper(store, map, "a", nextWindowId);
+    long activationWindow = nextWindowId;
+    nextWindowId++;
+
+    SpillableByteArrayListMultimapImpl<String, String> clonedMap = KryoCloneUtils.cloneObject(map);
+    store.checkpointed(nextWindowId);
+    store.committed(nextWindowId);
+
+    store.beginWindow(nextWindowId);
+    map.beginWindow(nextWindowId);
+
+    List<String> list1 = map.get("a");
+
+    Assert.assertEquals(12, list1.size());
+
+    Assert.assertEquals("a", list1.get(0));
+    Assert.assertEquals("111", list1.get(1));
+    Assert.assertEquals("b", list1.get(2));
+    Assert.assertEquals("222", list1.get(3));
+    Assert.assertEquals("d", list1.get(4));
+    Assert.assertEquals("333", list1.get(5));
+    Assert.assertEquals("f", list1.get(6));
+    Assert.assertEquals("g", list1.get(7));
+    Assert.assertEquals("tt", list1.get(8));
+    Assert.assertEquals("ab", list1.get(9));
+    Assert.assertEquals("99", list1.get(10));
+    Assert.assertEquals("444", list1.get(11));
+
+    list1.add("111");
+
+    Assert.assertEquals("a", list1.get(0));
+    Assert.assertEquals("111", list1.get(1));
+    Assert.assertEquals("b", list1.get(2));
+    Assert.assertEquals("222", list1.get(3));
+    Assert.assertEquals("d", list1.get(4));
+    Assert.assertEquals("333", list1.get(5));
+    Assert.assertEquals("f", list1.get(6));
+    Assert.assertEquals("g", list1.get(7));
+    Assert.assertEquals("tt", list1.get(8));
+    Assert.assertEquals("ab", list1.get(9));
+    Assert.assertEquals("99", list1.get(10));
+    Assert.assertEquals("444", list1.get(11));
+    Assert.assertEquals("111", list1.get(12));
+
+    Assert.assertEquals(13, list1.size());
+
+    map.endWindow();
+    store.endWindow();
+
+    map.teardown();
+    store.teardown();
+
+    map = clonedMap;
+    store = map.getStore();
+
+    Attribute.AttributeMap.DefaultAttributeMap attributes = new Attribute.AttributeMap.DefaultAttributeMap();
+    attributes.put(DAG.APPLICATION_PATH, testMeta.applicationPath);
+    attributes.put(Context.OperatorContext.ACTIVATION_WINDOW_ID, activationWindow);
+    Context.OperatorContext context =
+        new OperatorContextTestHelper.TestIdOperatorContext(testMeta.operatorContext.getId(), attributes);
+
+    store.setup(context);
+    map.setup(context);
+
+    store.beginWindow(nextWindowId);
+    map.beginWindow(nextWindowId);
+
+    SerdeStringSlice serdeString = new SerdeStringSlice();
+    Slice keySlice = serdeString.serialize("a");
+    byte[] keyBytes = SliceUtils.concatenate(ID1, keySlice.toByteArray());
+
+    SpillableTestUtils.checkValue(store, 0L, keyBytes, 0, Lists.<String>newArrayList("a", "111", "b", "222", "d",
+        "333", "f", "g", "tt", "ab", "99", "444"));
+
+    map.endWindow();
+    store.endWindow();
+
+    map.teardown();
+    store.teardown();
+  }
 }
+
