@@ -33,6 +33,10 @@
     <name>dt.application.NYCTrafficAnalysisApp.operator.QueryResult.topic</name>
     <value>QueryResult</value>
   </property>
+  <property>
+    <name>dt.gateway.listenAddress</name>
+    <value>node0.morado.com:9099</value>
+  </property>
 
 </configuration>
 
