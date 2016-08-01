@@ -16,29 +16,32 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.apex.malhar.lib.state.managed.spillable.inmem;
+package org.apache.apex.malhar.lib.utils.serde;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.apache.commons.lang3.mutable.MutableInt;
 
-import org.apache.apex.malhar.lib.state.spillable.inmem.InMemMultiset;
+import com.datatorrent.netlet.util.Slice;
 
-import com.esotericsoftware.kryo.Kryo;
-
-import com.datatorrent.lib.util.KryoCloneUtils;
-
-public class InMemMultisetTest
+/**
+ * Created by tfarkas on 7/22/16.
+ */
+public class PassThruSliceSerde implements Serde<Slice, Slice>
 {
-  @Test
-  public void serializationTest()
+  @Override
+  public Slice serialize(Slice object)
   {
-    InMemMultiset<String> set = new InMemMultiset<>();
+    return object;
+  }
 
-    set.add("a");
-    set.add("a");
+  @Override
+  public Slice deserialize(Slice object, MutableInt offset)
+  {
+    return object;
+  }
 
-    InMemMultiset<String> cloned = KryoCloneUtils.cloneObject(new Kryo(), set);
-
-    Assert.assertEquals(2, cloned.count("a"));
+  @Override
+  public Slice deserialize(Slice object)
+  {
+    return object;
   }
 }
