@@ -53,7 +53,7 @@ public class SpillableTestUtils
 
   static class TestMeta extends TestWatcher
   {
-    ManagedStateSpillableStateStore store;
+    public ManagedStateSpillableStateStore store;
     Context.OperatorContext operatorContext;
     String applicationPath;
 
