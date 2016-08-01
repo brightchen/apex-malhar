@@ -134,7 +134,7 @@ public class WindowedOperatorTest
 
     windowedOperator.processWatermark(new WatermarkImpl(1200));
     windowedOperator.endWindow();
-    Assert.assertTrue(windowState.watermarkArrivalTime > 0);
+    Assert.assertTrue(windowState.watermarkArrivalTime >= 0);
     Assert.assertEquals("We should get one watermark tuple", 1, controlSink.getCount(false));
 
     windowedOperator.beginWindow(2);
