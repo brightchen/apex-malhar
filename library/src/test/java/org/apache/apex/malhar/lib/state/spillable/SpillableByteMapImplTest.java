@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.apex.malhar.lib.state.spillable;
 
 import org.junit.Assert;
@@ -7,11 +25,11 @@ import org.junit.Test;
 import org.apache.apex.malhar.lib.state.spillable.inmem.InMemSpillableStateStore;
 import org.apache.apex.malhar.lib.utils.serde.SerdeStringSlice;
 
-import com.esotericsoftware.kryo.Kryo;
-
+import com.datatorrent.api.Attribute;
 import com.datatorrent.api.Context;
+import com.datatorrent.api.DAG;
+import com.datatorrent.lib.helper.OperatorContextTestHelper;
 import com.datatorrent.lib.util.KryoCloneUtils;
-import com.datatorrent.netlet.util.Slice;
 
 /**
  * Created by tfarkas on 6/6/16.
@@ -52,7 +70,6 @@ public class SpillableByteMapImplTest
     long windowId = 0L;
     store.beginWindow(windowId);
     map.beginWindow(windowId);
-    windowId++;
 
     Assert.assertEquals(0, map.size());
 
@@ -78,9 +95,9 @@ public class SpillableByteMapImplTest
     store.checkpointed(windowId);
     store.committed(windowId);
 
+    windowId++;
     store.beginWindow(windowId);
     map.beginWindow(windowId);
-    windowId++;
 
     SpillableTestUtils.checkValue(store, 0L, "a", ID1, "1");
     SpillableTestUtils.checkValue(store, 0L, "b", ID1, "2");
@@ -117,9 +134,9 @@ public class SpillableByteMapImplTest
     store.checkpointed(windowId);
     store.committed(windowId);
 
+    windowId++;
     store.beginWindow(windowId);
     map.beginWindow(windowId);
-    windowId++;
 
     SpillableTestUtils.checkValue(store, 0L, "a", ID1, "1");
     SpillableTestUtils.checkValue(store, 0L, "b", ID1, "2");
@@ -167,7 +184,6 @@ public class SpillableByteMapImplTest
     long windowId = 0L;
     store.beginWindow(windowId);
     map.beginWindow(windowId);
-    windowId++;
 
     Assert.assertEquals(0, map.size());
 
@@ -203,9 +219,9 @@ public class SpillableByteMapImplTest
     SpillableTestUtils.checkValue(store, 0L, "c", ID1, null);
     SpillableTestUtils.checkValue(store, 0L, "d", ID1, null);
 
+    windowId++;
     store.beginWindow(windowId);
     map.beginWindow(windowId);
-    windowId++;
 
     Assert.assertEquals(1, map.size());
 
@@ -237,9 +253,9 @@ public class SpillableByteMapImplTest
     store.checkpointed(windowId);
     store.committed(windowId);
 
+    windowId++;
     store.beginWindow(windowId);
     map.beginWindow(windowId);
-    windowId++;
 
     SpillableTestUtils.checkValue(store, 0L, "a", ID1, "1");
     SpillableTestUtils.checkValue(store, 0L, "b", ID1, null);
@@ -273,6 +289,7 @@ public class SpillableByteMapImplTest
     store.checkpointed(windowId);
     store.committed(windowId);
 
+    windowId++;
     store.beginWindow(windowId);
     map.beginWindow(windowId);
 
@@ -327,7 +344,6 @@ public class SpillableByteMapImplTest
     store.beginWindow(windowId);
     map1.beginWindow(windowId);
     map2.beginWindow(windowId);
-    windowId++;
 
     map1.put("a", "1");
 
@@ -355,10 +371,10 @@ public class SpillableByteMapImplTest
     store.beforeCheckpoint(windowId);
     store.checkpointed(windowId);
 
+    windowId++;
     store.beginWindow(windowId);
     map1.beginWindow(windowId);
     map2.beginWindow(windowId);
-    windowId++;
 
     SpillableTestUtils.checkValue(store, 0L, "a", ID1, "1");
     SpillableTestUtils.checkValue(store, 0L, "b", ID1, "2");
@@ -378,6 +394,7 @@ public class SpillableByteMapImplTest
     store.beforeCheckpoint(windowId);
     store.checkpointed(windowId);
 
+    windowId++;
     store.beginWindow(windowId);
     map1.beginWindow(windowId);
     map2.beginWindow(windowId);
@@ -397,41 +414,7 @@ public class SpillableByteMapImplTest
   }
 
   @Test
-  public void managedStateTest()
-  {
-    testMeta.store.setup(testMeta.operatorContext);
-
-    testMeta.store.beginWindow(0L);
-    testMeta.store.put(0, new Slice(new byte[]{0, 0}), new Slice(new byte[]{10, 10}));
-    testMeta.store.endWindow();
-
-    testMeta.store.beginWindow(1L);
-    testMeta.store.put(0, new Slice(new byte[]{0, 0}), new Slice(new byte[]{10, 11}));
-    testMeta.store.endWindow();
-    testMeta.store.beforeCheckpoint(1L);
-    testMeta.store.checkpointed(1L);
-
-    SpillableStateStore store = KryoCloneUtils.cloneObject(new Kryo(), testMeta.store);
-
-    testMeta.store.beginWindow(2L);
-    testMeta.store.put(0, new Slice(new byte[]{0, 0}), new Slice(new byte[]{10, 12}));
-    testMeta.store.endWindow();
-
-    testMeta.store.teardown();
-
-    store.setup(testMeta.operatorContext);
-
-    store.beginWindow(2);
-
-    Assert.assertEquals(new Slice(new byte[]{10, 11}), testMeta.store.getSync(0L, new Slice(new byte[]{0, 0})));
-
-    store.endWindow();
-
-    store.teardown();
-  }
-
-  @Test
-  public void recoveryTest() throws Exception
+  public void recoveryWithManagedStateTest() throws Exception
   {
     SerdeStringSlice sss = new SerdeStringSlice();
 
@@ -442,50 +425,62 @@ public class SpillableByteMapImplTest
     testMeta.store.setup(testMeta.operatorContext);
     map1.setup(testMeta.operatorContext);
 
-    System.out.println("0");
     testMeta.store.beginWindow(0);
     map1.beginWindow(0);
     map1.put("x", "1");
     map1.put("y", "2");
     map1.put("z", "3");
+    map1.put("zz", "33");
+    Assert.assertEquals(4, map1.size());
     map1.endWindow();
 
     testMeta.store.endWindow();
 
-    System.out.println("1");
     testMeta.store.beginWindow(1);
     map1.beginWindow(1);
+    Assert.assertEquals(4, map1.size());
     map1.put("x", "4");
     map1.put("y", "5");
+    map1.remove("zz");
+    Assert.assertEquals(3, map1.size());
     map1.endWindow();
     testMeta.store.endWindow();
     testMeta.store.beforeCheckpoint(1);
     SpillableByteMapImpl<String, String> clonedMap1 = KryoCloneUtils.cloneObject(map1);
     testMeta.store.checkpointed(1);
 
-    System.out.println("2");
     testMeta.store.beginWindow(2);
     map1.beginWindow(2);
-    map1.put("x1", "6");
-    map1.put("y1", "7");
+    Assert.assertEquals(3, map1.size());
+    map1.put("x", "6");
+    map1.put("y", "7");
+    map1.put("w", "8");
+    Assert.assertEquals(4, map1.size());
     map1.endWindow();
     testMeta.store.endWindow();
     // simulating crash here
     map1.teardown();
     testMeta.store.teardown();
 
-    System.out.println("Recovering");
+    Attribute.AttributeMap.DefaultAttributeMap attributes = new Attribute.AttributeMap.DefaultAttributeMap();
+    attributes.put(DAG.APPLICATION_PATH, testMeta.applicationPath);
+    attributes.put(Context.OperatorContext.ACTIVATION_WINDOW_ID, 1L);
+    Context.OperatorContext context =
+        new OperatorContextTestHelper.TestIdOperatorContext(testMeta.operatorContext.getId(), attributes);
 
     map1 = clonedMap1;
-    testMeta.operatorContext.getAttributes().put(Context.OperatorContext.ACTIVATION_WINDOW_ID, 1L);
-    map1.getStore().setup(testMeta.operatorContext);
+    map1.getStore().setup(context);
     map1.setup(testMeta.operatorContext);
 
-    // recovery at window 1002
     map1.getStore().beginWindow(2);
     map1.beginWindow(2);
+    Assert.assertEquals(3, map1.size());
     Assert.assertEquals("4", map1.get("x"));
     Assert.assertEquals("5", map1.get("y"));
     Assert.assertEquals("3", map1.get("z"));
+    map1.endWindow();
+    map1.getStore().endWindow();
+
+    map1.teardown();
   }
 }
