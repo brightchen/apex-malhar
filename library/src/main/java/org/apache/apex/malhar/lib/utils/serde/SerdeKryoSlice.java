@@ -42,7 +42,8 @@ public class SerdeKryoSlice<T> implements Serde<T, Slice>
   // Setup ThreadLocal of Kryo instances
   private static final ThreadLocal<Kryo> kryos = new ThreadLocal<Kryo>()
   {
-    protected Kryo initialValue() {
+    protected Kryo initialValue()
+    {
       Kryo kryo = new Kryo();
       // configure kryo instance, customize settings
       return kryo;

@@ -19,7 +19,6 @@
 package org.apache.apex.malhar.lib.window;
 
 import org.junit.Assert;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 
