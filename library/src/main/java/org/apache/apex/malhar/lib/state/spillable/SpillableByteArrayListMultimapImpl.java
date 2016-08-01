@@ -78,13 +78,14 @@ public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.Spill
     SpillableArrayListImpl<V> spillableArrayList = cache.get(key);
 
     if (spillableArrayList == null) {
-      Slice keyPrefix = SliceUtils.concatenate(identifier, serdeKey.serialize(key));
-      Integer size = map.get(SliceUtils.concatenate(keyPrefix, SIZE_KEY_SUFFIX).toByteArray());
-
+//      Slice keyPrefix = SliceUtils.concatenate(identifier, serdeKey.serialize(key));
+//      Integer size = map.get(SliceUtils.concatenate(keyPrefix, SIZE_KEY_SUFFIX).toByteArray());
+      Integer size = map.get(getKeyForMap(key));
       if (size == null) {
         return null;
       }
 
+      Slice keyPrefix = SliceUtils.concatenate(identifier, serdeKey.serialize(key));
       spillableArrayList = new SpillableArrayListImpl<V>(bucket, keyPrefix.toByteArray(), store, serdeValue);
       spillableArrayList.setSize(size);
     }
@@ -93,6 +94,7 @@ public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.Spill
 
     return spillableArrayList;
   }
+
 
   @Override
   public Set<K> keySet()
@@ -264,13 +266,32 @@ public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.Spill
       SpillableArrayListImpl<V> spillableArrayList = cache.get(key);
       spillableArrayList.endWindow();
 
-      Integer size = map.put(SliceUtils.concatenate(serdeKey.serialize(key), SIZE_KEY_SUFFIX).toByteArray(),
+//      Integer size = map.put(SliceUtils.concatenate(serdeKey.serialize(key), SIZE_KEY_SUFFIX).toByteArray(),
+//          spillableArrayList.size());
+      Integer size = map.put(getKeyForMap(key),
           spillableArrayList.size());
     }
 
     Preconditions.checkState(cache.getRemovedKeys().isEmpty());
     cache.endWindow();
     map.endWindow();
+  }
+
+  public byte[] getKeyForMap(K key)
+  {
+    return SliceUtils.concatenate(serdeKey.serialize(key), SIZE_KEY_SUFFIX).toByteArray();
+  }
+  
+  public SpillableArrayListImpl<V> getFromStore(@Nullable K key)
+  {
+    Slice keyPrefix = SliceUtils.concatenate(identifier, serdeKey.serialize(key));
+    Integer size = map.get(getKeyForMap(key));
+    //Integer size = map.get(SliceUtils.concatenate(keyPrefix, SIZE_KEY_SUFFIX).toByteArray());
+
+    SpillableArrayListImpl<V> spillableArrayList = new SpillableArrayListImpl<V>(bucket, keyPrefix.toByteArray(), store,
+        serdeValue);
+
+    return spillableArrayList;
   }
 
   @Override

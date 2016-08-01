@@ -206,6 +206,12 @@
       <version>${apex.core.version}</version>
     </dependency>
     <dependency>
+      <groupId>org.apache.apex</groupId>
+      <artifactId>apex-api</artifactId>
+      <version>${apex.core.version}</version>
+      <type>jar</type>
+    </dependency>
+    <dependency>
       <groupId>com.icegreen</groupId>
       <artifactId>greenmail</artifactId>
       <version>1.3.1b</version>
