@@ -74,8 +74,38 @@ public class SpillableByteArrayListMultimapImplTest
     long nextWindowId = 0L;
     nextWindowId = simpleMultiKeyTestHelper(store, map, "a", nextWindowId);
     nextWindowId++;
+
+    store.beginWindow(nextWindowId);
+    map.beginWindow(nextWindowId);
+
+    Assert.assertEquals(1, map.size());
+
+    map.endWindow();
+    store.endWindow();
+
+    nextWindowId++;
     nextWindowId = simpleMultiKeyTestHelper(store, map, "b", nextWindowId);
+    nextWindowId++;
+
+    store.beginWindow(nextWindowId);
+    map.beginWindow(nextWindowId);
+
+    Assert.assertEquals(2, map.size());
+
+    map.endWindow();
+    store.endWindow();
+
+    nextWindowId++;
     simpleMultiKeyTestHelper(store, map, "c", nextWindowId);
+
+    nextWindowId++;
+    store.beginWindow(nextWindowId);
+    map.beginWindow(nextWindowId);
+
+    Assert.assertEquals(3, map.size());
+
+    map.endWindow();
+    store.endWindow();
 
     map.teardown();
     store.teardown();
@@ -91,9 +121,9 @@ public class SpillableByteArrayListMultimapImplTest
 
     byte[] keyBytes = SliceUtils.concatenate(ID1, keySlice.toByteArray());
 
+    nextWindowId++;
     store.beginWindow(nextWindowId);
     map.beginWindow(nextWindowId);
-    nextWindowId++;
 
     Assert.assertNull(map.get(key));
 
@@ -124,9 +154,9 @@ public class SpillableByteArrayListMultimapImplTest
     map.endWindow();
     store.endWindow();
 
+    nextWindowId++;
     store.beginWindow(nextWindowId);
     map.beginWindow(nextWindowId);
-    nextWindowId++;
 
     SpillableTestUtils.checkValue(store, 0L,
         SliceUtils.concatenate(keyBytes, SpillableByteArrayListMultimapImpl.SIZE_KEY_SUFFIX), 8, 0, serdeInt);
@@ -162,9 +192,9 @@ public class SpillableByteArrayListMultimapImplTest
     map.endWindow();
     store.endWindow();
 
+    nextWindowId++;
     store.beginWindow(nextWindowId);
     map.beginWindow(nextWindowId);
-    nextWindowId++;
 
     Assert.assertEquals(12, list2.size());
 
@@ -199,6 +229,7 @@ public class SpillableByteArrayListMultimapImplTest
     map.endWindow();
     store.endWindow();
 
+    nextWindowId++;
     store.beginWindow(nextWindowId);
     map.beginWindow(nextWindowId);
 
@@ -301,6 +332,9 @@ public class SpillableByteArrayListMultimapImplTest
     SpillableTestUtils.checkValue(store, 0L, keyBytes, 0, Lists.<String>newArrayList("a", "111", "b", "222", "d",
         "333", "f", "g", "tt", "ab", "99", "444"));
 
+    Assert.assertEquals(1, map.size());
+    Assert.assertEquals(12, map.get("a").size());
+
     map.endWindow();
     store.endWindow();
 
@@ -308,4 +342,3 @@ public class SpillableByteArrayListMultimapImplTest
     store.teardown();
   }
 }
-

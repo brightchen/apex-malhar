@@ -45,7 +45,7 @@ import com.datatorrent.netlet.util.Slice;
 public class ManagedStateTestUtils
 {
   public static void transferBucketHelper(FileAccess fileAccess, long bucketId, Map<Slice, Bucket.BucketedValue>
-    unsavedBucket,
+      unsavedBucket,
       int keysPerTimeBucket) throws IOException
   {
     RemoteIterator<LocatedFileStatus> iterator = fileAccess.listFiles(bucketId);

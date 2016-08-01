@@ -70,7 +70,6 @@ public class SpillableByteMapImplTest
     long windowId = 0L;
     store.beginWindow(windowId);
     map.beginWindow(windowId);
-    windowId++;
 
     Assert.assertEquals(0, map.size());
 
@@ -96,9 +95,9 @@ public class SpillableByteMapImplTest
     store.checkpointed(windowId);
     store.committed(windowId);
 
+    windowId++;
     store.beginWindow(windowId);
     map.beginWindow(windowId);
-    windowId++;
 
     SpillableTestUtils.checkValue(store, 0L, "a", ID1, "1");
     SpillableTestUtils.checkValue(store, 0L, "b", ID1, "2");
@@ -135,9 +134,9 @@ public class SpillableByteMapImplTest
     store.checkpointed(windowId);
     store.committed(windowId);
 
+    windowId++;
     store.beginWindow(windowId);
     map.beginWindow(windowId);
-    windowId++;
 
     SpillableTestUtils.checkValue(store, 0L, "a", ID1, "1");
     SpillableTestUtils.checkValue(store, 0L, "b", ID1, "2");
@@ -185,7 +184,6 @@ public class SpillableByteMapImplTest
     long windowId = 0L;
     store.beginWindow(windowId);
     map.beginWindow(windowId);
-    windowId++;
 
     Assert.assertEquals(0, map.size());
 
@@ -221,9 +219,9 @@ public class SpillableByteMapImplTest
     SpillableTestUtils.checkValue(store, 0L, "c", ID1, null);
     SpillableTestUtils.checkValue(store, 0L, "d", ID1, null);
 
+    windowId++;
     store.beginWindow(windowId);
     map.beginWindow(windowId);
-    windowId++;
 
     Assert.assertEquals(1, map.size());
 
@@ -255,9 +253,9 @@ public class SpillableByteMapImplTest
     store.checkpointed(windowId);
     store.committed(windowId);
 
+    windowId++;
     store.beginWindow(windowId);
     map.beginWindow(windowId);
-    windowId++;
 
     SpillableTestUtils.checkValue(store, 0L, "a", ID1, "1");
     SpillableTestUtils.checkValue(store, 0L, "b", ID1, null);
@@ -291,6 +289,7 @@ public class SpillableByteMapImplTest
     store.checkpointed(windowId);
     store.committed(windowId);
 
+    windowId++;
     store.beginWindow(windowId);
     map.beginWindow(windowId);
 
@@ -345,7 +344,6 @@ public class SpillableByteMapImplTest
     store.beginWindow(windowId);
     map1.beginWindow(windowId);
     map2.beginWindow(windowId);
-    windowId++;
 
     map1.put("a", "1");
 
@@ -373,10 +371,10 @@ public class SpillableByteMapImplTest
     store.beforeCheckpoint(windowId);
     store.checkpointed(windowId);
 
+    windowId++;
     store.beginWindow(windowId);
     map1.beginWindow(windowId);
     map2.beginWindow(windowId);
-    windowId++;
 
     SpillableTestUtils.checkValue(store, 0L, "a", ID1, "1");
     SpillableTestUtils.checkValue(store, 0L, "b", ID1, "2");
@@ -396,6 +394,7 @@ public class SpillableByteMapImplTest
     store.beforeCheckpoint(windowId);
     store.checkpointed(windowId);
 
+    windowId++;
     store.beginWindow(windowId);
     map1.beginWindow(windowId);
     map2.beginWindow(windowId);

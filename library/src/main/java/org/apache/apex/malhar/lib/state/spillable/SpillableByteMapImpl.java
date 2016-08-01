@@ -124,7 +124,7 @@ public class SpillableByteMapImpl<K, V> implements Spillable.SpillableByteMap<K,
       return null;
     }
 
-    tempOffset.setValue(valSlice.offset);
+    tempOffset.setValue(0);
     return serdeValue.deserialize(valSlice, tempOffset);
   }
 
