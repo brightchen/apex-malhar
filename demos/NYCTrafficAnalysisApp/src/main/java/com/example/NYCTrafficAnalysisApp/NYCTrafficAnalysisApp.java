@@ -103,6 +103,7 @@ public class NYCTrafficAnalysisApp implements StreamingApplication
 
       //query result
       PubSubWebSocketAppDataResult queryResult = createAppDataResult();
+      dag.addOperator("QueryResult", queryResult);
       queryResult.setUri(queryUri);
 
       // Set remaining dag options
