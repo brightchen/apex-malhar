@@ -38,7 +38,6 @@ public class SpillableWindowedStorageTest
   @Rule
   public SpillableTestUtils.TestMeta testMeta = new SpillableTestUtils.TestMeta();
 
-  @Ignore
   @Test
   public void testWindowedPlainStorage()
   {
@@ -90,7 +89,6 @@ public class SpillableWindowedStorageTest
     Assert.assertEquals(3L, storage.get(window3).longValue());
   }
 
-  @Ignore
   @Test
   public void testWindowedKeyedStorage()
   {
