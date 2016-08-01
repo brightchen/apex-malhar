@@ -278,7 +278,7 @@ public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.Spill
 
       SpillableArrayListImpl<V> spillableArrayList = cache.get(key);
       spillableArrayList.endWindow();
-      Integer size = map.put(SliceUtils.concatenate(identifier, SliceUtils.concatenate(serdeKey.serialize(key), SIZE_KEY_SUFFIX)).toByteArray(),
+      Integer size = map.put(SliceUtils.concatenate(serdeKey.serialize(key), SIZE_KEY_SUFFIX).toByteArray(),
           spillableArrayList.size());
     }
 
