@@ -18,6 +18,7 @@
  */
 package org.apache.apex.malhar.lib.window.impl;
 
+import java.util.AbstractMap;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -46,7 +47,40 @@ public class SpillableWindowedPlainStorage<T> implements WindowedStorage.Windowe
   private Serde<Window, Slice> windowSerde;
   private Serde<T, Slice> valueSerde;
 
-  protected Spillable.SpillableByteMap<Window, T> internMap;
+  protected Spillable.SpillableByteMap<Window, T> spillableWindowMap;
+
+  // TODO: We need the list of windows, but SpillableByteMap does not provide the list of keys in the storage.
+  // Remove this when it has that support
+  protected Spillable.SpillableArrayList<Window> spillableWindowList;
+
+  private class EntryIterator implements Iterator<Map.Entry<Window, T>>
+  {
+    Iterator<Window> iterator;
+
+    EntryIterator()
+    {
+      this.iterator = spillableWindowList.iterator();
+    }
+
+    @Override
+    public boolean hasNext()
+    {
+      return iterator.hasNext();
+    }
+
+    @Override
+    public Map.Entry<Window, T> next()
+    {
+      Window window = iterator.next();
+      return new AbstractMap.SimpleEntry<>(window, spillableWindowMap.get(window));
+    }
+
+    @Override
+    public void remove()
+    {
+      throw new UnsupportedOperationException();
+    }
+  }
 
   public SpillableWindowedPlainStorage()
   {
@@ -82,49 +116,60 @@ public class SpillableWindowedPlainStorage<T> implements WindowedStorage.Windowe
   @Override
   public void put(Window window, T value)
   {
-    internMap.put(window, value);
+    if (!spillableWindowMap.containsKey(window)) {
+      spillableWindowList.add(window);
+    }
+    spillableWindowMap.put(window, value);
   }
 
   @Override
   public T get(Window window)
   {
-    return internMap.get(window);
+    return spillableWindowMap.get(window);
   }
 
   @Override
   public Iterable<Map.Entry<Window, T>> entrySet()
   {
-    return internMap.entrySet();
+    return new Iterable<Map.Entry<Window, T>>()
+    {
+      @Override
+      public Iterator<Map.Entry<Window, T>> iterator()
+      {
+        return new EntryIterator();
+      }
+    };
   }
 
   @Override
   public Iterator<Map.Entry<Window, T>> iterator()
   {
-    return internMap.entrySet().iterator();
+    return new EntryIterator();
   }
 
   @Override
   public boolean containsWindow(Window window)
   {
-    return internMap.containsKey(window);
+    return spillableWindowMap.containsKey(window);
   }
 
   @Override
   public long size()
   {
-    return internMap.size();
+    return spillableWindowMap.size();
   }
 
   @Override
   public void remove(Window window)
   {
-    internMap.remove(window);
+    spillableWindowList.remove(window);
+    spillableWindowMap.remove(window);
   }
 
   @Override
   public void migrateWindow(Window fromWindow, Window toWindow)
   {
-    internMap.put(toWindow, internMap.remove(fromWindow));
+    spillableWindowMap.put(toWindow, spillableWindowMap.remove(fromWindow));
   }
 
   @Override
@@ -141,8 +186,11 @@ public class SpillableWindowedPlainStorage<T> implements WindowedStorage.Windowe
     if (valueSerde == null) {
       valueSerde = new SerdeKryoSlice<>();
     }
-    if (internMap == null) {
-      internMap = scc.newSpillableByteMap(bucket, windowSerde, valueSerde);
+    if (spillableWindowMap == null) {
+      spillableWindowMap = scc.newSpillableByteMap(bucket, windowSerde, valueSerde);
+    }
+    if (spillableWindowList == null) {
+      spillableWindowList = scc.newSpillableArrayList(bucket, windowSerde);
     }
   }
 

@@ -60,6 +60,29 @@ public class SpillableArrayListImpl<T> implements Spillable.SpillableArrayList<T
   private transient boolean isRunning = false;
   private transient boolean isInWindow = false;
 
+  private class ItemIterator implements Iterator<T>
+  {
+    int i = 0;
+
+    @Override
+    public boolean hasNext()
+    {
+      return i < size;
+    }
+
+    @Override
+    public T next()
+    {
+      return get(i++);
+    }
+
+    @Override
+    public void remove()
+    {
+      throw new UnsupportedOperationException();
+    }
+  }
+
   private SpillableArrayListImpl()
   {
     //for kryo
@@ -114,13 +137,24 @@ public class SpillableArrayListImpl<T> implements Spillable.SpillableArrayList<T
   @Override
   public boolean contains(Object o)
   {
-    throw new UnsupportedOperationException();
+    Iterator it = iterator();
+    while (it.hasNext()) {
+      Object item = it.next();
+      if (o == null) {
+        if (item == null) {
+          return true;
+        }
+      } else if (o.equals(item)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @Override
   public Iterator<T> iterator()
   {
-    throw new UnsupportedOperationException();
+    return new ItemIterator();
   }
 
   @Override

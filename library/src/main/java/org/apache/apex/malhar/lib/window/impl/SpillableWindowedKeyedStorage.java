@@ -19,6 +19,7 @@
 package org.apache.apex.malhar.lib.window.impl;
 
 import java.util.AbstractMap;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -27,10 +28,9 @@ import javax.validation.constraints.NotNull;
 
 import org.apache.apex.malhar.lib.state.spillable.Spillable;
 import org.apache.apex.malhar.lib.state.spillable.SpillableComplexComponent;
-import org.apache.apex.malhar.lib.state.spillable.SpillableStateStore;
-import org.apache.apex.malhar.lib.state.spillable.managed.ManagedStateSpillableStateStore;
 import org.apache.apex.malhar.lib.utils.serde.Serde;
 import org.apache.apex.malhar.lib.utils.serde.SerdeKryoSlice;
+import org.apache.apex.malhar.lib.window.SessionWindowedStorage;
 import org.apache.apex.malhar.lib.window.Window;
 import org.apache.apex.malhar.lib.window.WindowedStorage;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -45,7 +45,7 @@ import com.datatorrent.netlet.util.Slice;
  * @param <K> The key type
  * @param <V> The value type
  */
-public class SpillableWindowedKeyedStorage<K, V> implements WindowedStorage.WindowedKeyedStorage<K, V>
+public class SpillableWindowedKeyedStorage<K, V> implements WindowedStorage.WindowedKeyedStorage<K, V>, SessionWindowedStorage<K, V>
 {
   @NotNull
   private SpillableComplexComponent scc;
@@ -68,13 +68,15 @@ public class SpillableWindowedKeyedStorage<K, V> implements WindowedStorage.Wind
     {
       this.window = window;
       this.keys = internKeys.get(window);
-      this.iterator = this.keys.iterator();
+      if (this.keys != null) {
+        this.iterator = this.keys.iterator();
+      }
     }
 
     @Override
     public boolean hasNext()
     {
-      return iterator.hasNext();
+      return iterator != null && iterator.hasNext();
     }
 
     @Override
@@ -230,5 +232,11 @@ public class SpillableWindowedKeyedStorage<K, V> implements WindowedStorage.Wind
   public V get(Window window, K key)
   {
     return internValues.get(new ImmutablePair<>(window, key));
+  }
+
+  @Override
+  public Collection<Map.Entry<Window.SessionWindow<K>, V>> getSessionEntries(K key, long timestamp, long gap)
+  {
+    throw new UnsupportedOperationException();
   }
 }

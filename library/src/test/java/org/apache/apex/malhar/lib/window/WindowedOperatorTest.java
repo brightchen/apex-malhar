@@ -56,9 +56,9 @@ import com.datatorrent.lib.util.KeyValPair;
 public class WindowedOperatorTest
 {
   @Parameterized.Parameters
-  public static Collection<Boolean[]> useSpillable()
+  public static Collection<Object[]> testParameters()
   {
-    return Arrays.asList(new Boolean[][]{{false}, {true}});
+    return Arrays.asList(new Object[][]{{false}, {true}});
   }
 
   @Parameterized.Parameter
@@ -342,11 +342,9 @@ public class WindowedOperatorTest
   @Test
   public void testTimeWindowAssignment()
   {
-    OperatorContextTestHelper.TestIdOperatorContext context = new OperatorContextTestHelper.TestIdOperatorContext(1,
-        new Attribute.AttributeMap.DefaultAttributeMap());
     WindowedOperatorImpl<Long, MutableLong, Long> windowedOperator = createDefaultWindowedOperator();
     windowedOperator.setWindowOption(new WindowOption.TimeWindows(Duration.millis(1000)));
-    windowedOperator.setup(context);
+    windowedOperator.setup(testMeta.operatorContext);
     Tuple.WindowedTuple<Long> windowedValue = windowedOperator.getWindowedValue(new Tuple.TimestampedTuple<>(1100L, 2L));
     Collection<? extends Window> windows = windowedValue.getWindows();
     Assert.assertEquals(1, windows.size());

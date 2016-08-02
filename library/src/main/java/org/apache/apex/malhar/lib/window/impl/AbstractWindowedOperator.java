@@ -164,9 +164,6 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
   public void setWindowOption(WindowOption windowOption)
   {
     this.windowOption = windowOption;
-    if (this.windowOption instanceof WindowOption.GlobalWindow) {
-      windowStateMap.put(Window.GlobalWindow.getInstance(), new WindowState());
-    }
   }
 
   @Override
@@ -407,6 +404,9 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
     }
     for (Component component : components.values()) {
       component.setup(context);
+    }
+    if (this.windowOption instanceof WindowOption.GlobalWindow) {
+      windowStateMap.put(Window.GlobalWindow.getInstance(), new WindowState());
     }
   }
 
