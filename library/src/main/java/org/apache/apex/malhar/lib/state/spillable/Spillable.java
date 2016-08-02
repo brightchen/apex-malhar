@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Multiset;
 
@@ -112,5 +113,21 @@ public interface Spillable
      * {@link com.datatorrent.api.Operator#endWindow()} method has been called.
      */
     void endWindow();
+
+    /**
+     * Returns true if the {@link SpillableComponent} has had it's setup method called and teardown has not been
+     * called yet.
+     * @return True if the {@link SpillableComponent} has had it's setup method called and teardown has not been
+     * called yet
+     */
+    @VisibleForTesting
+    boolean isRunning();
+
+    /**
+     * Returns true if the {@link SpillableComponent} is in a window.
+     * @return True if the {@link SpillableComponent} is in a window.
+     */
+    @VisibleForTesting
+    boolean isInWindow();
   }
 }

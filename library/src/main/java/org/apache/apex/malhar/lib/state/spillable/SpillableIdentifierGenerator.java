@@ -16,30 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.apex.malhar.lib.state.managed.spillable.inmem;
+package org.apache.apex.malhar.lib.state.spillable;
 
-import org.junit.Assert;
-import org.junit.Test;
-
-import org.apache.apex.malhar.lib.state.spillable.inmem.InMemSpillableByteArrayListMultimap;
-
-import com.esotericsoftware.kryo.Kryo;
-
-import com.datatorrent.lib.util.KryoCloneUtils;
-
-public class InMemSpillableByteArrayListMultimapTest
+/**
+ * Classes implementing this interface can be used as generators for identifiers for Spillable data structures.
+ */
+public interface SpillableIdentifierGenerator
 {
-  @Test
-  public void serializationTest()
-  {
-    InMemSpillableByteArrayListMultimap<String, String> multimap =
-        new InMemSpillableByteArrayListMultimap<String, String>();
+  /**
+   * Generators the next valid identifier for a Spillable data structure.
+   * @return A byte array which represents the next valid identifier for a Spillable data structure.
+   */
+  public byte[] next();
 
-    multimap.put("a", "b");
-    multimap.put("a", "c");
-
-    InMemSpillableByteArrayListMultimap<String, String> cloned = KryoCloneUtils.cloneObject(new Kryo(), multimap);
-
-    Assert.assertEquals(2, cloned.get("a").size());
-  }
+  /**
+   * Registers the given identifier with this {@link SpillableIdentifierGenerator}.
+   * @param identifier The identifier to register with this {@link SpillableIdentifierGenerator}.
+   */
+  public void register(byte[] identifier);
 }
