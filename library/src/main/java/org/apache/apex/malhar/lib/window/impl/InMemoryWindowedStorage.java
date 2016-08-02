@@ -99,28 +99,4 @@ public class InMemoryWindowedStorage<T> implements WindowedStorage.WindowedPlain
   {
   }
 
-  @Override
-  public void beginApexWindow(long windowId)
-  {
-  }
-
-  @Override
-  public void endApexWindow()
-  {
-  }
-
-  @Override
-  public void beforeCheckpoint(long windowId)
-  {
-  }
-
-  @Override
-  public void checkpointed(long windowId)
-  {
-  }
-
-  @Override
-  public void committed(long windowId)
-  {
-  }
 }

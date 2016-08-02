@@ -32,6 +32,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import org.apache.apex.malhar.lib.state.spillable.SpillableComplexComponentImpl;
 import org.apache.apex.malhar.lib.state.spillable.SpillableTestUtils;
 import org.apache.apex.malhar.lib.window.impl.InMemoryWindowedKeyedStorage;
 import org.apache.apex.malhar.lib.window.impl.InMemoryWindowedStorage;
@@ -57,7 +58,7 @@ public class WindowedOperatorTest
   @Parameterized.Parameters
   public static Collection<Boolean[]> useSpillable()
   {
-    return Arrays.asList(new Boolean[][]{{false}});
+    return Arrays.asList(new Boolean[][]{{false}, {true}});
   }
 
   @Parameterized.Parameter
@@ -86,15 +87,17 @@ public class WindowedOperatorTest
   {
     WindowedOperatorImpl<Long, MutableLong, Long> windowedOperator = new WindowedOperatorImpl<>();
     if (useSpillable) {
+      SpillableComplexComponentImpl sccImpl = new SpillableComplexComponentImpl(testMeta.store);
       SpillableWindowedPlainStorage<WindowState> wss = new SpillableWindowedPlainStorage<>();
-      wss.setStore(testMeta.store);
+      wss.setSpillableComplexComponent(sccImpl);
       windowStateStorage = wss;
       SpillableWindowedPlainStorage<MutableLong> pds = new SpillableWindowedPlainStorage<>();
-      pds.setStore(testMeta.store);
+      pds.setSpillableComplexComponent(sccImpl);
       plainDataStorage = pds;
       SpillableWindowedPlainStorage<Long> prs = new SpillableWindowedPlainStorage<>();
-      prs.setStore(testMeta.store);
+      prs.setSpillableComplexComponent(sccImpl);
       plainRetractionStorage = prs;
+      windowedOperator.addComponent("SpillableComplexComponent", sccImpl);
     } else {
       windowStateStorage = new InMemoryWindowedStorage<>();
       plainDataStorage = new InMemoryWindowedStorage<>();
@@ -111,15 +114,17 @@ public class WindowedOperatorTest
   {
     KeyedWindowedOperatorImpl<String, Long, MutableLong, Long> windowedOperator = new KeyedWindowedOperatorImpl<>();
     if (useSpillable) {
+      SpillableComplexComponentImpl sccImpl = new SpillableComplexComponentImpl(testMeta.store);
       SpillableWindowedPlainStorage<WindowState> wss = new SpillableWindowedPlainStorage<>();
-      wss.setStore(testMeta.store);
+      wss.setSpillableComplexComponent(sccImpl);
       windowStateStorage = wss;
       SpillableWindowedKeyedStorage<String, MutableLong> kds = new SpillableWindowedKeyedStorage<>();
-      kds.setStore(testMeta.store);
+      kds.setSpillableComplexComponent(sccImpl);
       keyedDataStorage = kds;
       SpillableWindowedKeyedStorage<String, Long> krs = new SpillableWindowedKeyedStorage<>();
-      krs.setStore(testMeta.store);
+      krs.setSpillableComplexComponent(sccImpl);
       keyedRetractionStorage = krs;
+      windowedOperator.addComponent("SpillableComplexComponent", sccImpl);
     } else {
       windowStateStorage = new InMemoryWindowedStorage<>();
       keyedDataStorage = new InMemoryWindowedKeyedStorage<>();

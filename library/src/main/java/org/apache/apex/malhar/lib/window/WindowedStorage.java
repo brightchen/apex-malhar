@@ -31,7 +31,7 @@ import com.datatorrent.api.Operator;
  * make sure checkpointing and recovery will be done correctly.
  */
 @InterfaceStability.Unstable
-public interface WindowedStorage extends Operator.CheckpointNotificationListener, Component<Context.OperatorContext>
+public interface WindowedStorage extends Component<Context.OperatorContext>
 {
   /**
    * Returns true if the storage contains this window
@@ -62,18 +62,6 @@ public interface WindowedStorage extends Operator.CheckpointNotificationListener
    * @param toWindow
    */
   void migrateWindow(Window fromWindow, Window toWindow);
-
-  /**
-   * Callback for beginning Apex window
-   *
-   * @param windowId
-   */
-  void beginApexWindow(long windowId);
-
-  /**
-   * Callback for ending Apex window
-   */
-  void endApexWindow();
 
   /**
    * This interface handles plain value per window. If there is a large key/value map for each window that can't be

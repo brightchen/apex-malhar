@@ -22,6 +22,7 @@ import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 
+import org.apache.apex.malhar.lib.state.spillable.SpillableComplexComponentImpl;
 import org.apache.apex.malhar.lib.state.spillable.SpillableTestUtils;
 import org.apache.apex.malhar.lib.window.impl.SpillableWindowedKeyedStorage;
 import org.apache.apex.malhar.lib.window.impl.SpillableWindowedPlainStorage;
@@ -40,39 +41,41 @@ public class SpillableWindowedStorageTest
   @Test
   public void testWindowedPlainStorage()
   {
+    SpillableComplexComponentImpl sccImpl = new SpillableComplexComponentImpl(testMeta.store);
     SpillableWindowedPlainStorage<Integer> storage = new SpillableWindowedPlainStorage<>();
     Window window1 = new Window.TimeWindow<>(1000, 10);
     Window window2 = new Window.TimeWindow<>(1010, 10);
     Window window3 = new Window.TimeWindow<>(1020, 10);
-    storage.setStore(testMeta.store);
+    storage.setSpillableComplexComponent(sccImpl);
     storage.setup(testMeta.operatorContext);
-    storage.beginApexWindow(1000);
+    sccImpl.setup(testMeta.operatorContext);
+    sccImpl.beginWindow(1000);
     storage.put(window1, 1);
     storage.put(window2, 2);
     storage.put(window3, 3);
-    storage.endApexWindow();
-    storage.beginApexWindow(1001);
+    sccImpl.endWindow();
+    sccImpl.beginWindow(1001);
     storage.put(window1, 4);
     storage.put(window2, 5);
-    storage.endApexWindow();
-    storage.beforeCheckpoint(1001);
+    sccImpl.endWindow();
+    sccImpl.beforeCheckpoint(1001);
     SpillableWindowedPlainStorage<Integer> clonedStorage = KryoCloneUtils.cloneObject(storage);
-    storage.checkpointed(1001);
+    sccImpl.checkpointed(1001);
 
 
-    storage.beginApexWindow(1002);
+    sccImpl.beginWindow(1002);
     storage.put(window1, 6);
     storage.put(window2, 7);
-    storage.endApexWindow();
+    sccImpl.endWindow();
 
     Assert.assertEquals(6L, storage.get(window1).longValue());
     Assert.assertEquals(7L, storage.get(window2).longValue());
     Assert.assertEquals(3L, storage.get(window3).longValue());
 
-    storage.beginApexWindow(1003);
+    sccImpl.beginWindow(1003);
     storage.put(window1, 8);
     storage.put(window2, 9);
-    storage.endApexWindow();
+    sccImpl.endWindow();
 
     // simulating crash here
     storage.teardown();
@@ -82,7 +85,7 @@ public class SpillableWindowedStorageTest
     storage.setup(testMeta.operatorContext);
 
     // recovery at window 1002
-    storage.beginApexWindow(1002);
+    sccImpl.beginWindow(1002);
     Assert.assertEquals(4L, storage.get(window1).longValue());
     Assert.assertEquals(5L, storage.get(window2).longValue());
     Assert.assertEquals(3L, storage.get(window3).longValue());
@@ -91,31 +94,33 @@ public class SpillableWindowedStorageTest
   @Test
   public void testWindowedKeyedStorage()
   {
+    SpillableComplexComponentImpl sccImpl = new SpillableComplexComponentImpl(testMeta.store);
     SpillableWindowedKeyedStorage<String, Integer> storage = new SpillableWindowedKeyedStorage<>();
     Window window1 = new Window.TimeWindow<>(1000, 10);
     Window window2 = new Window.TimeWindow<>(1010, 10);
     Window window3 = new Window.TimeWindow<>(1020, 10);
-    storage.setStore(testMeta.store);
+    storage.setSpillableComplexComponent(sccImpl);
     storage.setup(testMeta.operatorContext);
-    storage.beginApexWindow(1000);
+    sccImpl.setup(testMeta.operatorContext);
+    sccImpl.beginWindow(1000);
     storage.put(window1, "x", 1);
     storage.put(window2, "x", 2);
     storage.put(window3, "x", 3);
-    storage.endApexWindow();
-    storage.beginApexWindow(1001);
+    sccImpl.endWindow();
+    sccImpl.beginWindow(1001);
     storage.put(window1, "x", 4);
     storage.put(window2, "x", 5);
-    storage.endApexWindow();
-    storage.beforeCheckpoint(1001);
+    sccImpl.endWindow();
+    sccImpl.beginWindow(1001);
     SpillableWindowedKeyedStorage<String, Integer> clonedStorage = KryoCloneUtils.cloneObject(storage);
-    storage.checkpointed(1001);
+    sccImpl.checkpointed(1001);
 
 
-    storage.beginApexWindow(1002);
+    sccImpl.beginWindow(1002);
     storage.put(window1, "x", 6);
     storage.put(window2, "x", 7);
     storage.put(window2, "y", 8);
-    storage.endApexWindow();
+    sccImpl.endWindow();
 
     Assert.assertEquals(6L, storage.get(window1, "x").longValue());
     Assert.assertEquals(7L, storage.get(window2, "x").longValue());
@@ -124,13 +129,14 @@ public class SpillableWindowedStorageTest
 
     // simulating crash here
     storage.teardown();
+    sccImpl.teardown();
 
     storage = clonedStorage;
     testMeta.operatorContext.getAttributes().put(Context.OperatorContext.ACTIVATION_WINDOW_ID, 1001L);
     storage.setup(testMeta.operatorContext);
 
     // recovery at window 1002
-    storage.beginApexWindow(1002);
+    sccImpl.beginWindow(1002);
     Assert.assertEquals(4L, storage.get(window1, "x").longValue());
     Assert.assertEquals(5L, storage.get(window2, "x").longValue());
     Assert.assertEquals(3L, storage.get(window3, "x").longValue());

@@ -20,6 +20,7 @@ package org.apache.apex.malhar.lib.window.impl;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -31,6 +32,7 @@ import org.joda.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.apex.malhar.lib.state.spillable.Spillable;
 import org.apache.apex.malhar.lib.window.Accumulation;
 import org.apache.apex.malhar.lib.window.ControlTuple;
 import org.apache.apex.malhar.lib.window.TriggerOption;
@@ -44,6 +46,7 @@ import org.apache.hadoop.classification.InterfaceStability;
 
 import com.google.common.base.Function;
 
+import com.datatorrent.api.Component;
 import com.datatorrent.api.Context;
 import com.datatorrent.api.DefaultInputPort;
 import com.datatorrent.api.DefaultOutputPort;
@@ -84,6 +87,9 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
   private long currentDerivedTimestamp = -1;
   private long timeIncrement;
   private long fixedWatermarkMillis = -1;
+
+  private Map<String, Component<Context.OperatorContext>> components = new HashMap<>();
+
   protected DataStorageT dataStorage;
   protected RetractionStorageT retractionStorage;
   protected AccumulationT accumulation;
@@ -216,6 +222,11 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
   public void setRetractionStorage(RetractionStorageT storageAgent)
   {
     this.retractionStorage = storageAgent;
+  }
+
+  public void addComponent(String key, Component<Context.OperatorContext> component)
+  {
+    components.put(key, component);
   }
 
   /**
@@ -394,6 +405,9 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
     if (retractionStorage != null) {
       retractionStorage.setup(context);
     }
+    for (Component component : components.values()) {
+      component.setup(context);
+    }
   }
 
   @Override
@@ -404,6 +418,9 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
     if (retractionStorage != null) {
       retractionStorage.teardown();
     }
+    for (Component component : components.values()) {
+      component.teardown();
+    }
   }
 
   /**
@@ -412,10 +429,10 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
   @Override
   public void beginWindow(long windowId)
   {
-    windowStateMap.beginApexWindow(windowId);
-    dataStorage.beginApexWindow(windowId);
-    if (retractionStorage != null) {
-      retractionStorage.beginApexWindow(windowId);
+    for (Component component : components.values()) {
+      if (component instanceof Spillable.SpillableComponent) {
+        ((Spillable.SpillableComponent)component).beginWindow(windowId);
+      }
     }
     if (currentDerivedTimestamp == -1) {
       // TODO: once we are able to get the firstWindowMillis from Apex Core API, we can use that instead
@@ -437,10 +454,10 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
     processWatermarkAtEndWindow();
     fireTimeTriggers();
 
-    windowStateMap.endApexWindow();
-    dataStorage.endApexWindow();
-    if (retractionStorage != null) {
-      retractionStorage.endApexWindow();
+    for (Component component : components.values()) {
+      if (component instanceof Spillable.SpillableComponent) {
+        ((Spillable.SpillableComponent)component).endWindow();
+      }
     }
   }
 
@@ -538,35 +555,33 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
     dataStorage.remove(window);
   }
 
-
-
   @Override
   public void beforeCheckpoint(long windowId)
   {
-    windowStateMap.beforeCheckpoint(windowId);
-    dataStorage.beforeCheckpoint(windowId);
-    if (retractionStorage != null) {
-      retractionStorage.beforeCheckpoint(windowId);
+    for (Component component : components.values()) {
+      if (component instanceof CheckpointNotificationListener) {
+        ((CheckpointNotificationListener)component).beforeCheckpoint(windowId);
+      }
     }
   }
 
   @Override
   public void checkpointed(long windowId)
   {
-    windowStateMap.checkpointed(windowId);
-    dataStorage.checkpointed(windowId);
-    if (retractionStorage != null) {
-      retractionStorage.checkpointed(windowId);
+    for (Component component : components.values()) {
+      if (component instanceof CheckpointNotificationListener) {
+        ((CheckpointNotificationListener)component).checkpointed(windowId);
+      }
     }
   }
 
   @Override
   public void committed(long windowId)
   {
-    windowStateMap.committed(windowId);
-    dataStorage.committed(windowId);
-    if (retractionStorage != null) {
-      retractionStorage.committed(windowId);
+    for (Component component : components.values()) {
+      if (component instanceof CheckpointNotificationListener) {
+        ((CheckpointNotificationListener)component).committed(windowId);
+      }
     }
   }
 }

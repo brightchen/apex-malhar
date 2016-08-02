@@ -21,10 +21,10 @@ package org.apache.apex.malhar.lib.window.impl;
 import java.util.Iterator;
 import java.util.Map;
 
+import javax.validation.constraints.NotNull;
+
 import org.apache.apex.malhar.lib.state.spillable.Spillable;
-import org.apache.apex.malhar.lib.state.spillable.SpillableComplexComponentImpl;
-import org.apache.apex.malhar.lib.state.spillable.SpillableStateStore;
-import org.apache.apex.malhar.lib.state.spillable.managed.ManagedStateSpillableStateStore;
+import org.apache.apex.malhar.lib.state.spillable.SpillableComplexComponent;
 import org.apache.apex.malhar.lib.utils.serde.Serde;
 import org.apache.apex.malhar.lib.utils.serde.SerdeKryoSlice;
 import org.apache.apex.malhar.lib.window.Window;
@@ -40,8 +40,8 @@ import com.datatorrent.netlet.util.Slice;
  */
 public class SpillableWindowedPlainStorage<T> implements WindowedStorage.WindowedPlainStorage<T>
 {
-  private SpillableStateStore store;
-  private SpillableComplexComponentImpl sccImpl;
+  @NotNull
+  private SpillableComplexComponent scc;
   private long bucket;
   private Serde<Window, Slice> windowSerde;
   private Serde<T, Slice> valueSerde;
@@ -59,9 +59,9 @@ public class SpillableWindowedPlainStorage<T> implements WindowedStorage.Windowe
     this.valueSerde = valueSerde;
   }
 
-  public void setStore(SpillableStateStore store)
+  public void setSpillableComplexComponent(SpillableComplexComponent scc)
   {
-    this.store = store;
+    this.scc = scc;
   }
 
   public void setBucket(long bucket)
@@ -130,10 +130,6 @@ public class SpillableWindowedPlainStorage<T> implements WindowedStorage.Windowe
   @Override
   public void setup(Context.OperatorContext context)
   {
-    if (store == null) {
-      // provide a default store
-      store = new ManagedStateSpillableStateStore();
-    }
     if (bucket == 0) {
       // choose a bucket that is almost guaranteed to be unique
       bucket = (context.getValue(Context.DAGContext.APPLICATION_NAME) + "#" + context.getId()).hashCode();
@@ -145,46 +141,14 @@ public class SpillableWindowedPlainStorage<T> implements WindowedStorage.Windowe
     if (valueSerde == null) {
       valueSerde = new SerdeKryoSlice<>();
     }
-    if (sccImpl == null) {
-      sccImpl = new SpillableComplexComponentImpl(store);
-      internMap = sccImpl.newSpillableByteMap(bucket, windowSerde, valueSerde);
+    if (internMap == null) {
+      internMap = scc.newSpillableByteMap(bucket, windowSerde, valueSerde);
     }
-    sccImpl.setup(context);
   }
 
   @Override
   public void teardown()
   {
-    sccImpl.teardown();
   }
 
-  @Override
-  public void beginApexWindow(long windowId)
-  {
-    sccImpl.beginWindow(windowId);
-  }
-
-  @Override
-  public void endApexWindow()
-  {
-    sccImpl.endWindow();
-  }
-
-  @Override
-  public void beforeCheckpoint(long windowId)
-  {
-    sccImpl.beforeCheckpoint(windowId);
-  }
-
-  @Override
-  public void checkpointed(long windowId)
-  {
-    sccImpl.checkpointed(windowId);
-  }
-
-  @Override
-  public void committed(long windowId)
-  {
-    sccImpl.committed(windowId);
-  }
 }

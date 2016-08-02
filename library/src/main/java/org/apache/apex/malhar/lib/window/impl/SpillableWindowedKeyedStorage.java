@@ -23,8 +23,10 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import javax.validation.constraints.NotNull;
+
 import org.apache.apex.malhar.lib.state.spillable.Spillable;
-import org.apache.apex.malhar.lib.state.spillable.SpillableComplexComponentImpl;
+import org.apache.apex.malhar.lib.state.spillable.SpillableComplexComponent;
 import org.apache.apex.malhar.lib.state.spillable.SpillableStateStore;
 import org.apache.apex.malhar.lib.state.spillable.managed.ManagedStateSpillableStateStore;
 import org.apache.apex.malhar.lib.utils.serde.Serde;
@@ -45,8 +47,8 @@ import com.datatorrent.netlet.util.Slice;
  */
 public class SpillableWindowedKeyedStorage<K, V> implements WindowedStorage.WindowedKeyedStorage<K, V>
 {
-  private SpillableStateStore store;
-  private SpillableComplexComponentImpl sccImpl;
+  @NotNull
+  private SpillableComplexComponent scc;
   private long bucket;
   private Serde<Window, Slice> windowSerde;
   private Serde<Pair<Window, K>, Slice> windowKeyPairSerde;
@@ -103,9 +105,9 @@ public class SpillableWindowedKeyedStorage<K, V> implements WindowedStorage.Wind
     this.valueSerde = valueSerde;
   }
 
-  public void setStore(SpillableStateStore store)
+  public void setSpillableComplexComponent(SpillableComplexComponent scc)
   {
-    this.store = store;
+    this.scc = scc;
   }
 
   public void setBucket(long bucket)
@@ -171,10 +173,6 @@ public class SpillableWindowedKeyedStorage<K, V> implements WindowedStorage.Wind
   @Override
   public void setup(Context.OperatorContext context)
   {
-    if (store == null) {
-      // provide a default managed state store
-      store = new ManagedStateSpillableStateStore();
-    }
     if (bucket == 0) {
       // choose a bucket that is guaranteed to be unique in Apex
       bucket = (context.getValue(Context.DAGContext.APPLICATION_NAME) + "#" + context.getId()).hashCode();
@@ -193,30 +191,17 @@ public class SpillableWindowedKeyedStorage<K, V> implements WindowedStorage.Wind
       valueSerde = new SerdeKryoSlice<>();
     }
 
-    if (sccImpl == null) {
-      sccImpl = new SpillableComplexComponentImpl(store);
-      internValues = sccImpl.newSpillableByteMap(bucket, windowKeyPairSerde, valueSerde);
-      internKeys = sccImpl.newSpillableByteArrayListMultimap(bucket, windowSerde, keySerde);
+    if (internValues == null) {
+      internValues = scc.newSpillableByteMap(bucket, windowKeyPairSerde, valueSerde);
     }
-    sccImpl.setup(context);
+    if (internKeys == null) {
+      internKeys = scc.newSpillableByteArrayListMultimap(bucket, windowSerde, keySerde);
+    }
   }
 
   @Override
   public void teardown()
   {
-    sccImpl.teardown();
-  }
-
-  @Override
-  public void beginApexWindow(long windowId)
-  {
-    sccImpl.beginWindow(windowId);
-  }
-
-  @Override
-  public void endApexWindow()
-  {
-    sccImpl.endWindow();
   }
 
   @Override
@@ -245,23 +230,5 @@ public class SpillableWindowedKeyedStorage<K, V> implements WindowedStorage.Wind
   public V get(Window window, K key)
   {
     return internValues.get(new ImmutablePair<>(window, key));
-  }
-
-  @Override
-  public void beforeCheckpoint(long windowId)
-  {
-    sccImpl.beforeCheckpoint(windowId);
-  }
-
-  @Override
-  public void checkpointed(long windowId)
-  {
-    sccImpl.checkpointed(windowId);
-  }
-
-  @Override
-  public void committed(long windowId)
-  {
-    sccImpl.committed(windowId);
   }
 }
