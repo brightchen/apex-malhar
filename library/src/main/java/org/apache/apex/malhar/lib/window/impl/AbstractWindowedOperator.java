@@ -430,12 +430,13 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
   public void beginWindow(long windowId)
   {
     for (Component component : components.values()) {
+      // TODO: We should have a new generic interface WindowListener that listens for beginWindow and endWindow events
       if (component instanceof Spillable.SpillableComponent) {
         ((Spillable.SpillableComponent)component).beginWindow(windowId);
       }
     }
     if (currentDerivedTimestamp == -1) {
-      // TODO: once we are able to get the firstWindowMillis from Apex Core API, we can use that instead
+      // TODO: once we are able to get the firstWindowMillis from Apex Core API, we should use that instead
       currentDerivedTimestamp = (windowId >> 32) * 1000;
     } else {
       currentDerivedTimestamp += timeIncrement;
@@ -455,6 +456,7 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
     fireTimeTriggers();
 
     for (Component component : components.values()) {
+      // TODO: We should have a new generic interface WindowListener that listens for beginWindow and endWindow events
       if (component instanceof Spillable.SpillableComponent) {
         ((Spillable.SpillableComponent)component).endWindow();
       }
