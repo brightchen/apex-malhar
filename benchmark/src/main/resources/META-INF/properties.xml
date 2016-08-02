@@ -193,6 +193,11 @@
     <name>dt.application.CouchBaseAppInput.operator.couchbaseInput.store.passwordMeta</name>
     <value></value>
   </property>
+  
+  <property>
+    <name>dt.application.SpillableBenchmarkApp.storeBasePath</name>
+    <value>SpillableBenchmarkApp/Store</value>
+  </property>
 
 </configuration>
 

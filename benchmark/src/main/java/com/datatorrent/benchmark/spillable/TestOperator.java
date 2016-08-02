@@ -1,6 +1,5 @@
 package com.datatorrent.benchmark.spillable;
 
-import org.junit.Assert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -12,9 +11,9 @@ import org.apache.apex.malhar.lib.state.spillable.managed.ManagedStateSpillableS
 import org.apache.apex.malhar.lib.utils.serde.SerdeLongSlice;
 import org.apache.apex.malhar.lib.utils.serde.SerdeStringSlice;
 
+import com.datatorrent.api.Context.OperatorContext;
 import com.datatorrent.api.DefaultInputPort;
 import com.datatorrent.api.Operator;
-import com.datatorrent.api.Context.OperatorContext;
 import com.datatorrent.common.util.BaseOperator;
 
 public class TestOperator extends BaseOperator implements Operator.CheckpointNotificationListener
@@ -90,20 +89,17 @@ public class TestOperator extends BaseOperator implements Operator.CheckpointNot
   public void checkData()
   {
     logger.info("checkData(): totalCount: {}; minWinId: {}; committedWinId: {}; curWinId: {}", totalCount, this.minWinId, committedWinId, this.windowId);
-    boolean hasErr = false;
     for(long winId = Math.max(committedWinId+1, minWinId); winId < this.windowId; ++winId) {
       Long count = this.windowToCount.get(winId);
       SpillableArrayListImpl<String> datas = (SpillableArrayListImpl<String>)multiMap.get("" + winId);
       if((datas == null && count != null) || (datas != null && count == null)) {
         logger.error("====datas: {}; count: {}", datas, count);
-        hasErr = true;
       } else if(datas == null && count == null) {
         logger.error("Both datas and count are null. probably something wrong.");
       } else {
         int dataSize = datas.size();
         if((long)count != (long)dataSize) {
           logger.error("====data size not equal: window Id: {}; datas size: {}; count: {}", winId, dataSize, count);
-          hasErr = true;
         } 
       }
     }
