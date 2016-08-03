@@ -118,6 +118,12 @@ public interface Window<WINDOW extends Window> extends Comparable<WINDOW>
     }
 
     @Override
+    public int hashCode()
+    {
+      return (int)(((beginTimestamp << 2) & 0xFFFF0000) + (durationMillis & 0xFFFF));
+    }
+    
+    @Override
     public boolean equals(Object other)
     {
       if (other instanceof TimeWindow) {

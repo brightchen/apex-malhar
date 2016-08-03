@@ -69,6 +69,7 @@ class StateTracker extends TimerTask
           }
         });
     long intervalMillis = managedStateImpl.getCheckStateSizeInterval().getMillis();
+    LOG.info("", new RuntimeException());
     memoryFreeService.scheduleAtFixedRate(this, intervalMillis, intervalMillis);
   }
 

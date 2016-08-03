@@ -58,7 +58,8 @@ public class WindowedOperatorTest
   @Parameterized.Parameters
   public static Collection<Object[]> testParameters()
   {
-    return Arrays.asList(new Object[][]{{false}, {true}});
+    //return Arrays.asList(new Object[][]{{false}, {true}});
+    return Arrays.asList(new Object[][]{{true}});
   }
 
   @Parameterized.Parameter
@@ -288,6 +289,7 @@ public class WindowedOperatorTest
   public void testTriggerWithAccumulatingModeFiringOnlyUpdatedPanes()
   {
     for (boolean firingOnlyUpdatedPanes : new boolean[]{true, false}) {
+      useSpillable = firingOnlyUpdatedPanes;
       WindowedOperatorImpl<Long, MutableLong, Long> windowedOperator = createDefaultWindowedOperator();
       TriggerOption triggerOption = new TriggerOption().withEarlyFiringsAtEvery(Duration.millis(1000))
           .accumulatingFiredPanes();
