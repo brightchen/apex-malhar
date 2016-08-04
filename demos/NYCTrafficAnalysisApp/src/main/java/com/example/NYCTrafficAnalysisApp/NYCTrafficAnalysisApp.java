@@ -103,13 +103,13 @@ public class NYCTrafficAnalysisApp implements StreamingApplication
     dag.setAttribute(store, Context.OperatorContext.COUNTERS_AGGREGATOR,
     new BasicCounters.LongAggregator<MutableLong>());
 
+    dag.setOutputPortAttribute(parser.outDup, Context.PortContext.TUPLE_CLASS, POJOobject.class);
     dag.setOutputPortAttribute(parser.out, Context.PortContext.TUPLE_CLASS, POJOobject.class);
-    dag.setOutputPortAttribute(parser.parsedOutput, Context.PortContext.TUPLE_CLASS, POJOobject.class);
     dag.setInputPortAttribute(consoleOutput.input, Context.PortContext.TUPLE_CLASS, POJOobject.class);
     dag.setInputPortAttribute(dimensions.input, Context.PortContext.TUPLE_CLASS, POJOobject.class);
 
     dag.addStream("FileInputToParser", reader.output, parser.in);
-    dag.addStream("ParserToConsole", parser.parsedOutput, consoleOutput.input);
+    dag.addStream("ParserToConsole", parser.outDup, consoleOutput.input);
     dag.addStream("ParserToDC", parser.out, dimensions.input);
     dag.addStream("DimensionalStreamToStore", dimensions.output, store.input);
     dag.addStream("StoreToQueryResult", store.queryResult, queryResult.input);

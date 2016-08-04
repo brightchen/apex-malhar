@@ -11,7 +11,7 @@ public class POJOobject {
     private String dropoff;
     private String cartype;
     private int fare;
-    private Date time;
+    private long time;
 
     @Override
     public String toString()
@@ -59,13 +59,13 @@ public class POJOobject {
         this.fare = fare;
     }
 
-//    public void setTime(Date time)
+//    public void setTime(long time)
 //    {
 //        this.time = time;
 //    }
 //
-//    public Date getTime()
-//    {
-//        return System.currentTimeMillis();
-//    }
+    public long getTime()
+    {
+        return System.currentTimeMillis();
+    }
 }
