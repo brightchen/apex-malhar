@@ -16,6 +16,7 @@
     <!-- change this if you desire to use a different version of Apex Core -->
     <apex.version>3.4.0</apex.version>
     <apex.apppackage.classpath>lib/*.jar</apex.apppackage.classpath>
+    <malhar.version>3.4.0</malhar.version>
     <megh.version>3.4.0</megh.version>
   </properties>
 
@@ -168,26 +169,31 @@
     <dependency>
       <groupId>org.apache.apex</groupId>
       <artifactId>malhar-library</artifactId>
-      <version>3.4.0</version>
+      <version>${malhar.version}</version>
       <type>jar</type>
       <!-- 
            If you know that your application does not need transitive dependencies pulled in by malhar-library,
            uncomment the following to reduce the size of your app package.
       -->
-      <!--    
+
       <exclusions>
         <exclusion>
           <groupId>*</groupId>
           <artifactId>*</artifactId>
         </exclusion>
       </exclusions>
-      -->
     </dependency>
     <dependency>
       <groupId>org.apache.apex</groupId>
       <artifactId>apex-common</artifactId>
       <version>${apex.version}</version>
       <scope>provided</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.hadoop</groupId>
+          <artifactId>hadoop-common</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>junit</groupId>
@@ -226,6 +232,12 @@
     <groupId>com.datatorrent</groupId>
     <artifactId>dt-library</artifactId>
     <version>${megh.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.hadoop</groupId>
+          <artifactId>hadoop-common</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>com.datatorrent</groupId>
@@ -233,6 +245,12 @@
       <version>${megh.version}</version>
     </dependency>
 
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-common</artifactId>
+      <version>2.3.0</version>
+      <scope>provided</scope>
+    </dependency>
   </dependencies>
 
 </project>

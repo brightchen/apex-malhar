@@ -1,5 +1,7 @@
 package com.example.NYCTrafficAnalysisApp;
 
+import java.util.Date;
+
 /**
  * Created by aayushi on 7/7/16.
  */
@@ -9,11 +11,12 @@ public class POJOobject {
     private String dropoff;
     private String cartype;
     private int fare;
+    private Date time;
 
     @Override
     public String toString()
     {
-        return "POJOobject [pickup=" + pickup + /*", dropoff=" + dropoff + */ ", cartype=" + cartype + ", fare=" + fare + "]";
+        return "POJOobject [pickup=" + pickup + /*", dropoff=" + dropoff + */ ", cartype=" + cartype + ", fare=" + fare + ", time=" + time + "]";
     }
 
     public String getPickup()
@@ -55,4 +58,14 @@ public class POJOobject {
     {
         this.fare = fare;
     }
+
+//    public void setTime(Date time)
+//    {
+//        this.time = time;
+//    }
+//
+//    public Date getTime()
+//    {
+//        return System.currentTimeMillis();
+//    }
 }

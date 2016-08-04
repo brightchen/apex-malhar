@@ -37,91 +37,85 @@ public class NYCTrafficAnalysisApp implements StreamingApplication
 
   protected String PROP_STORE_PATH;
 
-
-//  public NYCTrafficAnalysisApp(String appName)
-//  {
-//    this.appName = appName;
-//    PROP_STORE_PATH = "dt.application." + appName + ".operator.StoreHDHT.fileStore.basePathPrefix";
-//  }
-
   @Override
   public void populateDAG(DAG dag, Configuration conf)
   {
     PROP_STORE_PATH = "dt.application." + appName + ".operator.StoreHDHT.fileStore.basePathPrefix";
-      String csvSchema = SchemaUtils.jarResourceFileToString("csvSchema.json");
-      String dcSchema = SchemaUtils.jarResourceFileToString("dcSchema.json");
+    String csvSchema = SchemaUtils.jarResourceFileToString("csvSchema.json");
+    String dcSchema = SchemaUtils.jarResourceFileToString("dcSchema.json");
 
-      LineByLineFileInputOperator reader = dag.addOperator("Reader",  LineByLineFileInputOperator.class);
-      CsvParser parser = dag.addOperator("Parser", CsvParser.class);
-      //ConsoleOutputOperator consoleOutput = dag.addOperator("Console", ConsoleOutputOperator.class);
-      DimensionsComputationFlexibleSingleSchemaPOJO dimensions = dag.addOperator("DimensionsComputation", DimensionsComputationFlexibleSingleSchemaPOJO.class);
-      AppDataSingleSchemaDimensionStoreHDHT store = dag.addOperator("StoreHDHT", AppDataSingleSchemaDimensionStoreHDHT.class);
-      //PubSubWebSocketAppDataQuery query = dag.addOperator("Query", PubSubWebSocketAppDataQuery.class);
-      //PubSubWebSocketAppDataResult queryResult = dag.addOperator("QueryResult", PubSubWebSocketAppDataResult.class);
+    LineByLineFileInputOperator reader = dag.addOperator("Reader",  LineByLineFileInputOperator.class);
+    CsvParser parser = dag.addOperator("Parser", CsvParser.class);
+    ConsoleOutputOperator consoleOutput = dag.addOperator("Console", ConsoleOutputOperator.class);
+    DimensionsComputationFlexibleSingleSchemaPOJO dimensions = dag.addOperator("DimensionsComputation", DimensionsComputationFlexibleSingleSchemaPOJO.class);
+    AppDataSingleSchemaDimensionStoreHDHT store = dag.addOperator("StoreHDHT", AppDataSingleSchemaDimensionStoreHDHT.class);
+    //PubSubWebSocketAppDataQuery query = dag.addOperator("Query", PubSubWebSocketAppDataQuery.class);
+    //PubSubWebSocketAppDataResult queryResult = dag.addOperator("QueryResult", PubSubWebSocketAppDataResult.class);
 
-      reader.setDirectory("/user/aayushi/testfiles");
-      parser.setSchema(csvSchema);
+    reader.setDirectory("/user/aayushi/testfiles");
+    parser.setSchema(csvSchema);
 
-      // Set operator properties
-      // key expression
-      {
-        Map<String, String> keyToExpression = Maps.newHashMap();
-        keyToExpression.put("pickup", "getPickup()");
-        keyToExpression.put("cartype", "getCartype()");
-        //keyToExpression.put("time", "getTime()");
-        dimensions.setKeyToExpression(keyToExpression);
-      }
+    //Set operator properties
+    //Key expression
+    {
+      Map<String, String> keyToExpression = Maps.newHashMap();
+      keyToExpression.put("pickup", "getPickup()");
+      keyToExpression.put("cartype", "getCartype()");
+      //keyToExpression.put("time", "getTime()");
+      dimensions.setKeyToExpression(keyToExpression);
+    }
 
-      // aggregate expression
-      {
-        Map<String, String> aggregateToExpression = Maps.newHashMap();
-        aggregateToExpression.put("fare", "getFare()");
-        dimensions.setAggregateToExpression(aggregateToExpression);
-      }
+    //Aggregate expression
+    {
+      Map<String, String> aggregateToExpression = Maps.newHashMap();
+      aggregateToExpression.put("fare", "getFare()");
+      dimensions.setAggregateToExpression(aggregateToExpression);
+    }
 
-      dimensions.setConfigurationSchemaJSON(dcSchema);
+    dimensions.setConfigurationSchemaJSON(dcSchema);
 
-      //store
-      String basePath = Preconditions.checkNotNull(conf.get(PROP_STORE_PATH),
-        "base path should be specified in the properties.xml");
-      TFileImpl hdsFile = new TFileImpl.DTFileImpl();
-      basePath += System.currentTimeMillis();
-      hdsFile.setBasePath(basePath);
+    //Store
+    String basePath = Preconditions.checkNotNull(conf.get(PROP_STORE_PATH),
+      "base path should be specified in the properties.xml");
+    TFileImpl hdsFile = new TFileImpl.DTFileImpl();
+    basePath += System.currentTimeMillis();
+    hdsFile.setBasePath(basePath);
 
-      store.setFileStore(hdsFile);
-      dag.setAttribute(store, Context.OperatorContext.COUNTERS_AGGREGATOR,
-      new BasicCounters.LongAggregator<MutableLong>());
-      store.setConfigurationSchemaJSON(dcSchema);
+    store.setFileStore(hdsFile);
+    dag.setAttribute(store, Context.OperatorContext.COUNTERS_AGGREGATOR,
+    new BasicCounters.LongAggregator<MutableLong>());
+    store.setConfigurationSchemaJSON(dcSchema);
 
-      //query
-      PubSubWebSocketAppDataQuery query = createAppDataQuery();
-      URI queryUri = ConfigUtil.getAppDataQueryPubSubURI(dag, conf);
-      logger.info("QueryUri: {}", queryUri);
-      query.setUri(queryUri);
-      //use the EmbeddableQueryInfoProvider instead to get rid of the problem of query schema when latency is very long
-      store.setEmbeddableQueryInfoProvider(query);
+    //Query
+    PubSubWebSocketAppDataQuery query = createAppDataQuery();
+    URI queryUri = ConfigUtil.getAppDataQueryPubSubURI(dag, conf);
+    logger.info("QueryUri: {}", queryUri);
+    query.setUri(queryUri);
+    //use the EmbeddableQueryInfoProvider instead to get rid of the problem of query schema when latency is very long
+    store.setEmbeddableQueryInfoProvider(query);
 
-      //query result
-      PubSubWebSocketAppDataResult queryResult = createAppDataResult();
-      dag.addOperator("QueryResult", queryResult);
-      queryResult.setUri(queryUri);
+    //Query Result
+    PubSubWebSocketAppDataResult queryResult = createAppDataResult();
+    dag.addOperator("QueryResult", queryResult);
+    queryResult.setUri(queryUri);
 
-      // Set remaining dag options
-      dag.setAttribute(store, Context.OperatorContext.COUNTERS_AGGREGATOR,
-      new BasicCounters.LongAggregator<MutableLong>());
+    //Set remaining dag options
+    dag.setAttribute(store, Context.OperatorContext.COUNTERS_AGGREGATOR,
+    new BasicCounters.LongAggregator<MutableLong>());
 
-      dag.setOutputPortAttribute(parser.out, Context.PortContext.TUPLE_CLASS, POJOobject.class);
-      dag.setInputPortAttribute(dimensions.input, Context.PortContext.TUPLE_CLASS, POJOobject.class);
-      //dag.setInputPortAttribute(consoleOutput.input, Context.PortContext.TUPLE_CLASS, POJOobject.class);
+    dag.setOutputPortAttribute(parser.out, Context.PortContext.TUPLE_CLASS, POJOobject.class);
+    dag.setOutputPortAttribute(parser.parsedOutput, Context.PortContext.TUPLE_CLASS, POJOobject.class);
+    dag.setInputPortAttribute(consoleOutput.input, Context.PortContext.TUPLE_CLASS, POJOobject.class);
+    dag.setInputPortAttribute(dimensions.input, Context.PortContext.TUPLE_CLASS, POJOobject.class);
 
-      dag.addStream("FileInputToParser", reader.output, parser.in);
-      dag.addStream("ParserToDC", parser.out, dimensions.input);
-      dag.addStream("DimensionalStreamToStore", dimensions.output, store.input);
-      dag.addStream("QueryResult", store.queryResult, queryResult.input);
+    dag.addStream("FileInputToParser", reader.output, parser.in);
+    dag.addStream("ParserToConsole", parser.parsedOutput, consoleOutput.input);
+    dag.addStream("ParserToDC", parser.out, dimensions.input);
+    dag.addStream("DimensionalStreamToStore", dimensions.output, store.input);
+    dag.addStream("StoreToQueryResult", store.queryResult, queryResult.input);
 
-      //dag.addStream("ParserToConsole", parser.out, consoleOutput.input);
-      //dag.addStream("FileInputToConsole", reader.output, consoleOutput.input);
-      //dag.addStream("randomData", randomGenerator.out, cons.input).setLocality(Locality.CONTAINER_LOCAL);
+    //dag.addStream("FileInputToConsole", reader.output, consoleOutput.input);
+    //dag.addStream("randomData", randomGenerator.out, cons.input).setLocality(Locality.CONTAINER_LOCAL);
   }
 
   protected PubSubWebSocketAppDataQuery createAppDataQuery()
