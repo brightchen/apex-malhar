@@ -1,6 +1,5 @@
 package com.datatorrent.benchmark.spillable;
 
-import org.apache.apex.malhar.lib.state.spillable.managed.ManagedStateSpillableStateStore;
 import org.apache.hadoop.conf.Configuration;
 
 import com.google.common.base.Preconditions;
@@ -31,16 +30,17 @@ public class SpillableBenchmarkApp implements StreamingApplication
 
     
     // Connect ports
-    dag.addStream("stream", input.output, testOperator.input );//.setLocality(DAG.Locality.CONTAINER_LOCAL);
+    dag.addStream("stream", input.output, testOperator.input ).setLocality(DAG.Locality.THREAD_LOCAL);
     //dag.setAttribute(Context.DAGContext.CHECKPOINT_WINDOW_COUNT, 1);  //use normal
     //dag.setAttribute(testOperator, Context.OperatorContext.CHECKPOINT_WINDOW_COUNT, 2);    
   }
 
   
-  public ManagedStateSpillableStateStore createStore(Configuration conf)
+  public OptimisedStateStore createStore(Configuration conf)
   {
     String basePath = getStoreBasePath(conf);
-    ManagedStateSpillableStateStore store = new ManagedStateSpillableStateStore();
+    //use optimisedStateStore
+    OptimisedStateStore store = new OptimisedStateStore();
     ((TFileImpl.DTFileImpl)store.getFileAccess()).setBasePath(basePath);
     return store;
   }

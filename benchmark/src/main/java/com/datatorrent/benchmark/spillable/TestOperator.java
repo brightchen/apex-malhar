@@ -1,5 +1,7 @@
 package com.datatorrent.benchmark.spillable;
 
+import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -7,11 +9,13 @@ import org.apache.apex.malhar.lib.state.spillable.SpillableArrayListImpl;
 import org.apache.apex.malhar.lib.state.spillable.SpillableByteArrayListMultimapImpl;
 import org.apache.apex.malhar.lib.state.spillable.SpillableByteMapImpl;
 import org.apache.apex.malhar.lib.state.spillable.SpillableStateStore;
-import org.apache.apex.malhar.lib.state.spillable.managed.ManagedStateSpillableStateStore;
 import org.apache.apex.malhar.lib.utils.serde.SerdeLongSlice;
 import org.apache.apex.malhar.lib.utils.serde.SerdeStringSlice;
 
 import com.datatorrent.api.Context.OperatorContext;
+
+import com.google.common.collect.Lists;
+
 import com.datatorrent.api.DefaultInputPort;
 import com.datatorrent.api.Operator;
 import com.datatorrent.common.util.BaseOperator;
@@ -28,13 +32,17 @@ public class TestOperator extends BaseOperator implements Operator.CheckpointNot
 //  protected SpillableByteMapImpl<String, String> map;
 //  protected SpillableArrayListImpl<String> list;
   
-  public ManagedStateSpillableStateStore store;
+  public OptimisedStateStore store;
   
   public long totalCount = 0;
   public transient long countInWindow;
   public long minWinId = -1;
   public long committedWinId = -1;
   public long windowId;
+  public transient long beginTime;
+  public List<SerdeStringSlice> stringSerdes = Lists.newArrayList();
+  
+  public final transient int delayWindows = 4;
   
   public SpillableByteMapImpl<Long, Long> windowToCount;
   
@@ -65,6 +73,7 @@ public class TestOperator extends BaseOperator implements Operator.CheckpointNot
   @Override
   public void setup(OperatorContext context)
   {
+    beginTime = System.currentTimeMillis();
     super.setup(context);
     if(windowToCount == null) {
       windowToCount = createWindowToCountMap(store);
@@ -88,7 +97,7 @@ public class TestOperator extends BaseOperator implements Operator.CheckpointNot
 
   public void checkData()
   {
-    logger.info("checkData(): totalCount: {}; minWinId: {}; committedWinId: {}; curWinId: {}", totalCount, this.minWinId, committedWinId, this.windowId);
+    logger.debug("checkData(): totalCount: {}; minWinId: {}; committedWinId: {}; curWinId: {}", totalCount, minWinId%10000, committedWinId%10000, this.windowId%10000);
     for(long winId = Math.max(committedWinId+1, minWinId); winId < this.windowId; ++winId) {
       Long count = this.windowToCount.get(winId);
       SpillableArrayListImpl<String> datas = (SpillableArrayListImpl<String>)multiMap.get("" + winId);
@@ -99,7 +108,7 @@ public class TestOperator extends BaseOperator implements Operator.CheckpointNot
       } else {
         int dataSize = datas.size();
         if((long)count != (long)dataSize) {
-          logger.error("====data size not equal: window Id: {}; datas size: {}; count: {}", winId, dataSize, count);
+          logger.error("====data size not equal: window Id: {}; datas size: {}; count: {}", winId%10000, dataSize, count);
         } 
       }
     }
@@ -131,6 +140,8 @@ public class TestOperator extends BaseOperator implements Operator.CheckpointNot
   @Override
   public void endWindow()
   {
+    long stepStartTime = System.currentTimeMillis();
+    
     multiMap.endWindow();
     windowToCount.put(windowId, countInWindow);
     windowToCount.endWindow();
@@ -138,21 +149,43 @@ public class TestOperator extends BaseOperator implements Operator.CheckpointNot
 //    list.endWindow();
     store.endWindow();
     
+    //logger.info("save spillable endWindow() took {} millis.", System.currentTimeMillis() - stepStartTime);
 
     if(windowId % 10 == 0) {
-      long startTime = System.currentTimeMillis();
+      stepStartTime = System.currentTimeMillis();
       checkData();
-      logger.info("checkData() took {} millis.", System.currentTimeMillis() - startTime);
+      logger.info("checkData() took {} millis.", System.currentTimeMillis() - stepStartTime);
+      
+      //statistics
+      long totalTime = System.currentTimeMillis() - beginTime;
+      logger.info("statistics: totalCount: {}; totalTime: {}; average/mill: {}", totalCount, totalTime, totalCount/totalTime);
     }
 
+    stepStartTime = System.currentTimeMillis();
+    //save for each window
+    store.beforeCheckpoint(windowId);
       
+    //it seems the committed never called. call here
+    if(windowId - delayWindows >= this.minWinId) {
+      committed(windowId - delayWindows );
+    }
+    
+    logger.info("beforeCheckpoint() and committed() took {} millis.", System.currentTimeMillis() - stepStartTime);
+    
+    stepStartTime = System.currentTimeMillis();
+    //clear the serialize buffer
+    for(SerdeStringSlice serde : stringSerdes) {
+      serde.buffer.reset();
+    }
+    //logger.info("serde buffer reset() took {} millis.", System.currentTimeMillis() - stepStartTime);
   }
 
   @Override
   public void beforeCheckpoint(long windowId)
   {
-    //logger.info("===beforeCheckpoint(). windowId: {}; count: {}", windowId, totalCount);
+    long startTime = System.currentTimeMillis();
     store.beforeCheckpoint(windowId);
+    logger.info("beforeCheckpoint(). windowId: {}; count: {}; spent time: {}", windowId%10000, totalCount, System.currentTimeMillis() - startTime);
   }
   
   @Override
@@ -166,23 +199,30 @@ public class TestOperator extends BaseOperator implements Operator.CheckpointNot
   {
     this.committedWinId = windowId;
     store.committed(windowId);
-    //logger.info("===committed. windowId: {}; count: {}", windowId, count);
+    logger.debug("committed. windowId: {}; count: {}", windowId%10000, totalCount);
   }
   
-  public static SpillableByteArrayListMultimapImpl<String, String> createMultimap(SpillableStateStore store)
+  public SpillableByteArrayListMultimapImpl<String, String> createMultimap(SpillableStateStore store)
   {
-    return new SpillableByteArrayListMultimapImpl<String, String>(store, ID1, 0L, new SerdeStringSlice(),
-        new SerdeStringSlice());
+    SerdeStringSlice keySerde = new SerdeStringSlice();
+    SerdeStringSlice valueSerde = new SerdeStringSlice();
+    stringSerdes.add(keySerde);
+    stringSerdes.add(valueSerde);
+    return new SpillableByteArrayListMultimapImpl<String, String>(store, ID1, 0L, keySerde, valueSerde);
   }
   
-  public static SpillableByteMapImpl<String, String> createMap(SpillableStateStore store)
+  public SpillableByteMapImpl<String, String> createMap(SpillableStateStore store)
   {
-    return new SpillableByteMapImpl<String, String>(store, ID2, 0L, new SerdeStringSlice(),
-        new SerdeStringSlice());
+    SerdeStringSlice keySerde = new SerdeStringSlice();
+    SerdeStringSlice valueSerde = new SerdeStringSlice();
+    stringSerdes.add(keySerde);
+    stringSerdes.add(valueSerde);
+    return new SpillableByteMapImpl<String, String>(store, ID2, 0L, keySerde, valueSerde);
   }
   
-  public static SpillableByteMapImpl<Long, Long> createWindowToCountMap(SpillableStateStore store)
+  public SpillableByteMapImpl<Long, Long> createWindowToCountMap(SpillableStateStore store)
   {
+    //bucket can only 0 as the default number bucket is 1
     return new SpillableByteMapImpl<Long, Long>(store, ID3, 0L, new SerdeLongSlice(),
         new SerdeLongSlice());
   }

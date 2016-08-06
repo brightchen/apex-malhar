@@ -109,6 +109,13 @@ public interface Bucket extends ManagedStateComponent
    */
   void recoveredData(long windowId, Map<Slice, Bucket.BucketedValue> recoveredData);
 
+  public void setSaved();
+  /**
+   * 
+   * @return true if the buck saved to file
+   */
+  boolean isSaved();
+  
   enum ReadSource
   {
     MEMORY,      //state in memory in key/value form
@@ -181,6 +188,7 @@ public interface Bucket extends ManagedStateComponent
   class DefaultBucket implements Bucket
   {
     private final long bucketId;
+    protected boolean saved = false;
 
     //Key -> Ordered values
     private transient Map<Slice, BucketedValue> flash = Maps.newConcurrentMap();
@@ -388,6 +396,8 @@ public interface Bucket extends ManagedStateComponent
         flash.put(key, bucketedValue);
         sizeInBytes.getAndAdd(key.length);
         sizeInBytes.getAndAdd(Long.SIZE);
+        
+        saved = false;
       }
       if (timeBucket > bucketedValue.getTimeBucket()) {
 
@@ -395,6 +405,8 @@ public interface Bucket extends ManagedStateComponent
         sizeInBytes.getAndAdd(inc);
         bucketedValue.setTimeBucket(timeBucket);
         bucketedValue.setValue(value);
+        
+        saved = false;
       }
     }
 
@@ -476,7 +488,9 @@ public interface Bucket extends ManagedStateComponent
             }
           }
 
-          committedData.put(savedWindow, bucketData);
+          //for windowed operation case, don't need committed data
+          bucketData.clear();
+          //committedData.put(savedWindow, bucketData);
           stateIterator.remove();
         } else {
           break;
@@ -534,6 +548,18 @@ public interface Bucket extends ManagedStateComponent
       return checkpointedData;
     }
 
+    @Override
+    public void setSaved()
+    {
+      saved = true;
+    }
+    
+    @Override
+    public boolean isSaved()
+    {
+      return saved;
+    }
+    
     private static final Logger LOG = LoggerFactory.getLogger(DefaultBucket.class);
   }
 }
