@@ -46,12 +46,11 @@ public class SpillableDSBenchmarkTest  extends SpillableByteArrayListMultimapImp
       Map<Long, Map<Slice, Bucket.BucketedValue>> flashData = Maps.newHashMap();
 
       for (Bucket bucket : buckets) {
-        if (bucket != null && !bucket.isSaved()) {
+        if (bucket != null) {
           Map<Slice, Bucket.BucketedValue> flashDataForBucket = bucket.checkpoint(windowId);
           if (!flashDataForBucket.isEmpty()) {
             flashData.put(bucket.getBucketId(), flashDataForBucket);
           }
-          bucket.setSaved();
         }
       }
       if (!flashData.isEmpty()) {
@@ -70,8 +69,8 @@ public class SpillableDSBenchmarkTest  extends SpillableByteArrayListMultimapImp
   @Test
   public void testSpillableMutimap()
   {
+    logger.info("=====================above use LVBuffer==========================");
     testSpillableMutimap(true);
-    logger.info("=====================above use LVBuffer, below not=====================");
 //    testSpillableMutimap(false);
   }
   

@@ -1,19 +1,12 @@
-package org.apache.apex.malhar.lib.window;
+package org.apache.apex.malhar.lib.state.spillable;
 
 import java.util.List;
 
 import org.junit.Assert;
 import org.junit.Test;
-import org.junit.rules.TestWatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.apex.malhar.lib.state.spillable.SpillableArrayListImpl;
-import org.apache.apex.malhar.lib.state.spillable.SpillableByteArrayListMultimapImpl;
-import org.apache.apex.malhar.lib.state.spillable.SpillableByteArrayListMultimapImplTest;
-import org.apache.apex.malhar.lib.state.spillable.SpillableByteMapImpl;
-import org.apache.apex.malhar.lib.state.spillable.SpillableStateStore;
-import org.apache.apex.malhar.lib.state.spillable.inmem.InMemSpillableStateStore;
 import org.apache.apex.malhar.lib.state.spillable.managed.ManagedStateSpillableStateStore;
 import org.apache.apex.malhar.lib.utils.serde.SerdeLongSlice;
 import org.apache.apex.malhar.lib.utils.serde.SerdeStringSlice;
@@ -60,7 +53,7 @@ public class SpillableDataStructureTest extends SpillableByteArrayListMultimapIm
   
   public static class TestOperator extends BaseOperator implements Operator.CheckpointNotificationListener
   {
-    public static transient final Logger logger = LoggerFactory.getLogger(TestOperator.class);
+    public static final transient Logger logger = LoggerFactory.getLogger(TestOperator.class);
     
     protected SpillableByteArrayListMultimapImpl<String, String> multiMap;
 //    protected SpillableByteMapImpl<String, String> map;
@@ -82,20 +75,21 @@ public class SpillableDataStructureTest extends SpillableByteArrayListMultimapIm
     //protected final String key = "window1";
     
     public final transient DefaultInputPort<String> input = new DefaultInputPort<String>()
-        {
-          @Override
-          public void process(String tuple)
-          {
-            processTuple(tuple);
-          }
-        };
+    {
+      @Override
+      public void process(String tuple)
+      {
+        processTuple(tuple);
+      }
+    };
         
     public void processTuple(String tuple)
     {
-      if(++totalCount == shutdownCount)
+      if (++totalCount == shutdownCount) {
         throw new RuntimeException("Test recovery. count = " + totalCount);
+      }
       countInWindow++;
-      multiMap.put(""+windowId, tuple);
+      multiMap.put("" + windowId, tuple);
 //      map.put(tuple, tuple);
 //      list.add(tuple);
     }
@@ -104,10 +98,10 @@ public class SpillableDataStructureTest extends SpillableByteArrayListMultimapIm
     public void setup(OperatorContext context)
     {
       super.setup(context);
-      if(windowToCount == null) {
+      if (windowToCount == null) {
         windowToCount = createWindowToCountMap(store);
       }
-      if(multiMap == null) {
+      if (multiMap == null) {
         multiMap = createMultimap(store);
       }
 //      if(map == null)
@@ -116,36 +110,37 @@ public class SpillableDataStructureTest extends SpillableByteArrayListMultimapIm
 //        list = new SpillableArrayListImpl(3L, ID3, store, new SerdeStringSlice());
       
       store.setup(context);
-//      map.setup(context);
+      //      map.setup(context);
       multiMap.setup(context);
-//      list.setup(context);
-     
-//      logger.info("setup(): count: {}; map size: {}", count, multiMap.size());
+      //      list.setup(context);
+
+      //      logger.info("setup(): count: {}; map size: {}", count, multiMap.size());
       checkData();
     }
 
     public void checkData()
     {
-      logger.info("checkData(): totalCount: {}; minWinId: {}; committedWinId: {}; curWinId: {}", totalCount, this.minWinId, committedWinId, this.windowId);
+      logger.info("checkData(): totalCount: {}; minWinId: {}; committedWinId: {}; curWinId: {}", totalCount,
+          this.minWinId, committedWinId, this.windowId);
       boolean hasErr = false;
-      for(long winId = Math.max(committedWinId+1, minWinId); winId < this.windowId; ++winId) {
+      for (long winId = Math.max(committedWinId + 1, minWinId); winId < this.windowId; ++winId) {
         Long count = this.windowToCount.get(winId);
         SpillableArrayListImpl<String> datas = (SpillableArrayListImpl<String>)multiMap.get("" + winId);
-        if((datas == null && count != null) || (datas != null && count == null)) {
+        if ((datas == null && count != null) || (datas != null && count == null)) {
           logger.error("====datas: {}; count: {}", datas, count);
           hasErr = true;
-        } else if(datas == null && count == null) {
+        } else if (datas == null && count == null) {
           logger.error("Both datas and count are null. probably something wrong.");
         } else {
           int dataSize = datas.size();
-          if((long)count != (long)dataSize) {
+          if ((long)count != (long)dataSize) {
             logger.error("====window Id: {}; datas size: {}; count: {}", winId, dataSize, count);
             hasErr = true;
           } else {
             logger.info("====window Id: {} checked ok, both dataSize and count are {}", winId, count);
           }
         }
-        
+
       }
       Assert.assertTrue(!hasErr);
     }
@@ -161,7 +156,7 @@ public class SpillableDataStructureTest extends SpillableByteArrayListMultimapIm
       multiMap.beginWindow(windowId);
 //      map.beginWindow(windowId);
 //      list.beginWindow(windowId);
-      if(minWinId < 0) {
+      if (minWinId < 0) {
         minWinId = windowId;
       }
         
@@ -184,13 +179,11 @@ public class SpillableDataStructureTest extends SpillableByteArrayListMultimapIm
       store.endWindow();
       
 
-      if(windowId % 10 == 0) {
+      if (windowId % 10 == 0) {
         long startTime = System.currentTimeMillis();
         checkData();
         logger.info("checkData() took {} millis.", System.currentTimeMillis() - startTime);
       }
-
-        
     }
 
     @Override
@@ -221,7 +214,8 @@ public class SpillableDataStructureTest extends SpillableByteArrayListMultimapIm
     // Create DAG for testing.
     LocalMode lma = LocalMode.newInstance();
 
-    StreamingApplication app = new StreamingApplication() {
+    StreamingApplication app = new StreamingApplication()
+    {
       @Override
       public void populateDAG(DAG dag, Configuration conf)
       {
@@ -262,7 +256,8 @@ public class SpillableDataStructureTest extends SpillableByteArrayListMultimapIm
     // Create DAG for testing.
     LocalMode lma = LocalMode.newInstance();
 
-    StreamingApplication app = new StreamingApplication() {
+    StreamingApplication app = new StreamingApplication()
+    {
       @Override
       public void populateDAG(DAG dag, Configuration conf)
       {
