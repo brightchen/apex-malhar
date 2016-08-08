@@ -60,6 +60,8 @@ public class SpillableDSBenchmarkTest  extends SpillableByteArrayListMultimapImp
         } catch (IOException e) {
           throw new RuntimeException(e);
         }
+        
+        flashData.clear();
       }
     }
 
@@ -70,7 +72,7 @@ public class SpillableDSBenchmarkTest  extends SpillableByteArrayListMultimapImp
   {
     testSpillableMutimap(true);
     logger.info("=====================above use LVBuffer, below not=====================");
-    testSpillableMutimap(false);
+//    testSpillableMutimap(false);
   }
   
   public void testSpillableMutimap(boolean useLvBuffer)
@@ -92,7 +94,6 @@ public class SpillableDSBenchmarkTest  extends SpillableByteArrayListMultimapImp
     }
 
 
-
     
     SpillableByteArrayListMultimapImpl<String, String> multiMap = new SpillableByteArrayListMultimapImpl<String, String>(store, ID1, 0L, keySerde, valueSerde);
     
@@ -100,22 +101,23 @@ public class SpillableDSBenchmarkTest  extends SpillableByteArrayListMultimapImp
     store.setup(testMeta.operatorContext);
     multiMap.setup(testMeta.operatorContext);
     
-    int loopCount = 100000;
+    int loopCount = 100000000;
     String[] strs = new String[]{"123", "45678", "abcdef", "dfaqecdgr"};
     
-    long startTime = System.currentTimeMillis();
+    final long startTime = System.currentTimeMillis();
     long key = 0;
     
     long windowId = 0;
     store.beginWindow(++windowId);
     multiMap.beginWindow(windowId);
     
+    int outputTimes = 0;
     for(int i=0; i<loopCount; ++i) {
       for(String str : strs) {
         multiMap.put("" + key, str);
       }
 
-      if(i % 1000 == 0)
+      if(i % 100000 == 0)
       {
         multiMap.endWindow();
         store.endWindow();
@@ -123,20 +125,24 @@ public class SpillableDSBenchmarkTest  extends SpillableByteArrayListMultimapImp
         //NOTES: it will great impact the performance if the size of buffer is too large
         if(useLvBuffer) {
           //clear the buffer
-          ((SerdeStringWithLVBuffer)keySerde).buffer.reset();
-          ((SerdeStringWithLVBuffer)valueSerde).buffer.reset();
+          ((SerdeStringWithLVBuffer)keySerde).reset();
+          ((SerdeStringWithLVBuffer)valueSerde).reset();
         }
         
         ++key;
-        if(i % 10000 == 0) {
-          long spentTime = System.currentTimeMillis() - startTime;
-          logger.info("Spent {} mills for {} operation. average: {}", spentTime, strs.length*i, strs.length*i/spentTime);
-        }
-        
+
         //next window
         store.beginWindow(++windowId);
         multiMap.beginWindow(windowId);
       }
+      
+      long spentTime = System.currentTimeMillis() - startTime;
+      if(spentTime > outputTimes * 60000) {
+        ++outputTimes;
+        logger.info("Spent {} mills for {} operation. average: {}", spentTime, strs.length*i, strs.length*i/spentTime);
+        checkEnvironment();
+      }
+      
     }
     long spentTime = System.currentTimeMillis() - startTime;
     
@@ -151,5 +157,16 @@ public class SpillableDSBenchmarkTest  extends SpillableByteArrayListMultimapImp
   @Override
   public void recoveryTestWithManagedState()
   {
+  }
+  
+  public void checkEnvironment()
+  {
+    Runtime runtime = Runtime.getRuntime();
+
+    long maxMemory = runtime.maxMemory();
+    long allocatedMemory = runtime.totalMemory();
+    long freeMemory = runtime.freeMemory();
+
+    logger.info("freeMemory: {}; allocatedMemory: {}; maxMemory: {}", freeMemory, allocatedMemory, maxMemory); 
   }
 }

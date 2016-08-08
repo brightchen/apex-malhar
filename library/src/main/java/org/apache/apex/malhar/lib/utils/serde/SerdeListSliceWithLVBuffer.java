@@ -11,21 +11,22 @@ import com.datatorrent.netlet.util.Slice;
 public class SerdeListSliceWithLVBuffer<T> extends SerdeListSlice<T> implements SerToLVBuffer<List<T>>
 {
   protected SerToLVBuffer<T> itemSerTo;
+  protected LVBuffer buffer;
   
   protected SerdeListSliceWithLVBuffer()
   {
     // for Kryo
   }
 
-  public SerdeListSliceWithLVBuffer(@NotNull SerToLVBuffer<T> serde)
+  public SerdeListSliceWithLVBuffer(@NotNull SerToLVBuffer<T> serde, LVBuffer buffer)
   {
-    this.itemSerTo = Preconditions.checkNotNull(itemSerTo);
+    this.itemSerTo = Preconditions.checkNotNull(serde);
+    this.buffer = Preconditions.checkNotNull(buffer);
   }
 
   @Override
   public Slice serialize(List<T> objects)
   {
-    LVBuffer buffer = new LVBuffer();
     serTo(objects, buffer);
     return buffer.toSlice();
   }
@@ -39,4 +40,9 @@ public class SerdeListSliceWithLVBuffer<T> extends SerdeListSlice<T> implements 
     }
   }
 
+  public void reset()
+  {
+    buffer.reset();
+  }
+  
 }

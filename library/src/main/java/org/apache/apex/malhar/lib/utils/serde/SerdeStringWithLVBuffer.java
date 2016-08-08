@@ -1,15 +1,32 @@
 package org.apache.apex.malhar.lib.utils.serde;
 
+import com.google.common.base.Preconditions;
+
 import com.datatorrent.netlet.util.Slice;
 
 public class SerdeStringWithLVBuffer extends SerdeStringSlice implements SerToLVBuffer<String>
 {
   //implement with shared buff
-  public LVBuffer buffer = new LVBuffer();
+  protected LVBuffer buffer;
+  
+  /**
+   * if don't use SerdeStringWithLVBuffer.serialize(String), can ignore LVBuffer
+   */
+  public SerdeStringWithLVBuffer()
+  {
+  }
+  
+  public SerdeStringWithLVBuffer(LVBuffer buffer)
+  {
+    this.buffer = Preconditions.checkNotNull(buffer);
+  }
   
   @Override
   public Slice serialize(String object)
   {
+    if(buffer == null) {
+      buffer = new LVBuffer();
+    }
     serTo(object, buffer);
     return buffer.toSlice();
   }
@@ -29,6 +46,11 @@ public class SerdeStringWithLVBuffer extends SerdeStringSlice implements SerToLV
     buffer.setObjectWithValue(str.getBytes());
   }
 
-
-
+  @Override
+  public void reset()
+  {
+    if(buffer != null) {
+      buffer.reset();
+    }
+  }
 }

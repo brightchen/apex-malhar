@@ -4,7 +4,7 @@ import org.apache.commons.lang3.mutable.MutableInt;
 
 import com.datatorrent.netlet.util.Slice;
 
-public class SerdeArrayWithLVBuffer<T> implements Serde<T[], Slice>, SerToLVBuffer<T[]>
+public class SerdeArrayWithLVBuffer<T> implements SerToLVBuffer<T[]>
 {
   protected Class<T> clazz;
   public SerdeArrayWithLVBuffer(Class<T> clazz)
@@ -53,6 +53,11 @@ public class SerdeArrayWithLVBuffer<T> implements Serde<T[], Slice>, SerToLVBuff
   {
     // TODO Auto-generated method stub
     return null;
+  }
+
+  @Override
+  public void reset()
+  {
   }
   
 }

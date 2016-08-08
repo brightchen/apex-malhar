@@ -18,21 +18,19 @@ import com.datatorrent.netlet.util.Slice;
  */
 public class LVBuffer
 {
-  protected static final int DEFAULT_CAPACITY = 10000000;
-  
-  ByteArrayOutputStream outputSteam = new ByteArrayOutputStream();
-  
+  //ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+  protected BlockBuffer outputStream;
   protected int lastOffset = 0;
   protected Map<Integer, Integer> placeHolderIdentifierToValue = Maps.newHashMap();
   
   public LVBuffer()
   {
-    this(DEFAULT_CAPACITY);
+    outputStream = new BlockBuffer();
   }
   
   public LVBuffer(int capacity)
   {
-    outputSteam = new ByteArrayOutputStream(capacity);
+    outputStream = new BlockBuffer(capacity);
   }
   
   protected transient final byte[] tmpLengthAsBytes = new byte[4];
@@ -41,8 +39,8 @@ public class LVBuffer
   {
     try {
       GPOUtils.serializeInt(length, tmpLengthAsBytes, new MutableInt(0));
-      outputSteam.write(tmpLengthAsBytes);
-    } catch (IOException e) {
+      outputStream.write(tmpLengthAsBytes);
+    } catch (Exception e) {
       throw new RuntimeException(e);
     }
   }
@@ -55,7 +53,7 @@ public class LVBuffer
    */
   public void setObjectValue(byte[] value, int offset, int length)
   {
-    outputSteam.write(value, offset, length);
+    outputStream.write(value, offset, length);
   }
   
   /**
@@ -86,10 +84,10 @@ public class LVBuffer
   public int markPlaceHolderForLength()
   {
     try {
-      int offset = outputSteam.size();
-      outputSteam.write(lengthPlaceHolder);
+      int offset = outputStream.size();
+      outputStream.write(lengthPlaceHolder);
       return offset;
-    } catch (IOException e) {
+    } catch (Exception e) {
       throw new RuntimeException(e);
     }
     
@@ -97,7 +95,7 @@ public class LVBuffer
   
   public int getSize()
   {
-    return outputSteam.size();
+    return outputStream.size();
   }
   
   /**
@@ -111,25 +109,33 @@ public class LVBuffer
     placeHolderIdentifierToValue.put(placeHolderId, length);
   }
   
+  
   public Slice toSlice()
   {
-    byte[] data = outputSteam.toByteArray();
-
-    MutableInt offset = new MutableInt();
-    for(Map.Entry<Integer, Integer> entry : placeHolderIdentifierToValue.entrySet()) {
-      offset.setValue(lastOffset + entry.getKey());
-      GPOUtils.serializeInt(entry.getValue(), data,  offset);
-    }
-    
-    Slice slice = new Slice(data, lastOffset, data.length - lastOffset);
-    lastOffset = data.length;
-    return slice;
+    return outputStream.toSlice();
   }
+  
+  
+  //this is the implement from the ByteArrayStream
+//  public Slice toSlice()
+//  {
+//    byte[] data = outputStream.toByteArray();
+//
+//    MutableInt offset = new MutableInt();
+//    for(Map.Entry<Integer, Integer> entry : placeHolderIdentifierToValue.entrySet()) {
+//      offset.setValue(lastOffset + entry.getKey());
+//      GPOUtils.serializeInt(entry.getValue(), data,  offset);
+//    }
+//    
+//    Slice slice = new Slice(data, lastOffset, data.length - lastOffset);
+//    lastOffset = data.length;
+//    return slice;
+//  }
   
   //reset environment for next object
   public void reset()
   {
-    outputSteam.reset();
+    outputStream.reset();
     lastOffset = 0;
     placeHolderIdentifierToValue.clear();
   }

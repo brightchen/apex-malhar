@@ -1,6 +1,10 @@
 package org.apache.apex.malhar.lib.utils.serde;
 
-public interface SerToLVBuffer<T>
+import com.datatorrent.netlet.util.Slice;
+
+public interface SerToLVBuffer<T> extends Serde<T, Slice>
 {
-  public void serTo(T object, LVBuffer buffer);
+  void serTo(T object, LVBuffer buffer);
+  
+  void reset();
 }
