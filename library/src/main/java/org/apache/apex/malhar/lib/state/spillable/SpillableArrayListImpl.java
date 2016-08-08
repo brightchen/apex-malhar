@@ -25,9 +25,12 @@ import java.util.ListIterator;
 
 import javax.validation.constraints.NotNull;
 
+import org.apache.apex.malhar.lib.utils.serde.LVBuffer;
+import org.apache.apex.malhar.lib.utils.serde.SerToLVBuffer;
 import org.apache.apex.malhar.lib.utils.serde.Serde;
 import org.apache.apex.malhar.lib.utils.serde.SerdeIntSlice;
 import org.apache.apex.malhar.lib.utils.serde.SerdeListSlice;
+import org.apache.apex.malhar.lib.utils.serde.SerdeListSliceWithLVBuffer;
 
 import com.esotericsoftware.kryo.DefaultSerializer;
 import com.esotericsoftware.kryo.serializers.FieldSerializer;
@@ -60,6 +63,9 @@ public class SpillableArrayListImpl<T> implements Spillable.SpillableArrayList<T
   private transient boolean isRunning = false;
   private transient boolean isInWindow = false;
 
+  protected SerdeListSliceWithLVBuffer<T> valueSerde;
+  protected transient LVBuffer buffer;
+  
   private SpillableArrayListImpl()
   {
     //for kryo
@@ -79,7 +85,31 @@ public class SpillableArrayListImpl<T> implements Spillable.SpillableArrayList<T
     this.store = Preconditions.checkNotNull(store);
     this.serde = Preconditions.checkNotNull(serde);
 
-    map = new SpillableByteMapImpl<>(store, prefix, bucketId, new SerdeIntSlice(), new SerdeListSlice(serde));
+    if(!(serde instanceof SerToLVBuffer)) {
+      throw new IllegalArgumentException("Invalid serde, expect instanceof SerToLVBuffer");
+    }
+      
+//    buffer = new LVBuffer();
+//    valueSerde = new SerdeListSliceWithLVBuffer((SerToLVBuffer)serde, buffer);
+    map = new SpillableByteMapImpl<>(store, prefix, bucketId, new SerdeIntSlice(), valueSerde);
+  }
+  
+  public SpillableArrayListImpl(long bucketId, @NotNull byte[] prefix,
+      @NotNull SpillableStateStore store,
+      @NotNull Serde<T, Slice> serde, 
+      @NotNull LVBuffer buffer)
+  {
+    this.bucketId = bucketId;
+    this.prefix = Preconditions.checkNotNull(prefix);
+    this.store = Preconditions.checkNotNull(store);
+    this.serde = Preconditions.checkNotNull(serde);
+
+    if(!(serde instanceof SerToLVBuffer)) {
+      throw new IllegalArgumentException("Invalid serde, expect instanceof SerToLVBuffer");
+    }
+      
+    valueSerde = new SerdeListSliceWithLVBuffer((SerToLVBuffer)serde, buffer);
+    map = new SpillableByteMapImpl<>(store, prefix, bucketId, new SerdeIntSlice(), valueSerde);
   }
 
   public SpillableArrayListImpl(long bucketId, @NotNull byte[] prefix,
@@ -92,7 +122,7 @@ public class SpillableArrayListImpl<T> implements Spillable.SpillableArrayList<T
     Preconditions.checkArgument(this.batchSize > 0);
     this.batchSize = batchSize;
   }
-
+  
   public void setSize(int size)
   {
     Preconditions.checkArgument(size >= 0);
@@ -296,6 +326,7 @@ public class SpillableArrayListImpl<T> implements Spillable.SpillableArrayList<T
   {
     isInWindow = false;
     map.endWindow();
+    valueSerde.reset();
   }
 
   @Override
