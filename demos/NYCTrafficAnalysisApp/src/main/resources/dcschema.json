@@ -1,14 +1,19 @@
-{"keys":[{"name":"Pickup","type":"string"},
-  {"name":"Cartype","type":"string"},
-  {"name":"Time","type":"string"}],
+{"keys":
+  [
+    {"name":"pickup","type":"string"},
+    {"name":"cartype","type":"string"},
+    {"name":"time","type":"long"}
+  ],
   "timeBuckets":["1m","1h","1d"],
   "values":
-  [{"name":"Fare","type":"long","aggregators":["SUM"]}],
+  [
+    {"name":"fare","type":"long","aggregators":["SUM","MAX"]}
+  ],
   "dimensions":
   [
-    {"combination":["Pickup","Cartype"]},
-    {"combination":["Pickup"]},
-    {"combination":["Cartype"]},
+    {"combination":["pickup","cartype"]},
+    {"combination":["pickup"]},
+    {"combination":["cartype"]},
     {"combination":[]}
   ]
 }

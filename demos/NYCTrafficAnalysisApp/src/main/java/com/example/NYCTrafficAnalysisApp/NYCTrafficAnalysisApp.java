@@ -3,8 +3,10 @@
  */
 package com.example.NYCTrafficAnalysisApp;
 
+import org.apache.apex.malhar.lib.dimensions.DimensionsEvent;
 import org.apache.commons.lang.mutable.MutableLong;
 import org.apache.hadoop.conf.Configuration;
+import com.datatorrent.lib.expression.JavaExpressionParser;
 
 import java.net.URI;
 import java.util.Map;
@@ -27,6 +29,7 @@ import com.datatorrent.lib.dimensions.DimensionsComputationFlexibleSingleSchemaP
 import com.datatorrent.contrib.dimensions.AppDataSingleSchemaDimensionStoreHDHT;
 import com.datatorrent.lib.io.PubSubWebSocketAppDataQuery;
 import com.datatorrent.lib.io.PubSubWebSocketAppDataResult;
+import com.datatorrent.lib.statistics.DimensionsComputationUnifierImpl;
 
 @ApplicationAnnotation(name = "NYCTrafficAnalysisApp")
 public class NYCTrafficAnalysisApp implements StreamingApplication
@@ -47,21 +50,23 @@ public class NYCTrafficAnalysisApp implements StreamingApplication
     LineByLineFileInputOperator reader = dag.addOperator("Reader",  LineByLineFileInputOperator.class);
     CsvParser parser = dag.addOperator("Parser", CsvParser.class);
     ConsoleOutputOperator consoleOutput = dag.addOperator("Console", ConsoleOutputOperator.class);
-    DimensionsComputationFlexibleSingleSchemaPOJO dimensions = dag.addOperator("DimensionsComputation", DimensionsComputationFlexibleSingleSchemaPOJO.class);
-    AppDataSingleSchemaDimensionStoreHDHT store = dag.addOperator("StoreHDHT", AppDataSingleSchemaDimensionStoreHDHT.class);
+
     //PubSubWebSocketAppDataQuery query = dag.addOperator("Query", PubSubWebSocketAppDataQuery.class);
     //PubSubWebSocketAppDataResult queryResult = dag.addOperator("QueryResult", PubSubWebSocketAppDataResult.class);
 
     reader.setDirectory("/user/aayushi/testfiles");
     parser.setSchema(csvSchema);
 
+    //Dimension Computation
+    DimensionsComputationFlexibleSingleSchemaPOJO dimensions = dag.addOperator("DimensionsComputation", DimensionsComputationFlexibleSingleSchemaPOJO.class);
     //Set operator properties
+
     //Key expression
     {
       Map<String, String> keyToExpression = Maps.newHashMap();
       keyToExpression.put("pickup", "getPickup()");
       keyToExpression.put("cartype", "getCartype()");
-      //keyToExpression.put("time", "getTime()");
+      keyToExpression.put("time", "getTime()");
       dimensions.setKeyToExpression(keyToExpression);
     }
 
@@ -73,15 +78,17 @@ public class NYCTrafficAnalysisApp implements StreamingApplication
     }
 
     dimensions.setConfigurationSchemaJSON(dcSchema);
+    dimensions.setUnifier(new DimensionsComputationUnifierImpl<DimensionsEvent.InputEvent, DimensionsEvent.Aggregate>());
 
-    //Store
+    //Dimension Store
+    AppDataSingleSchemaDimensionStoreHDHT store = dag.addOperator("StoreHDHT", AppDataSingleSchemaDimensionStoreHDHT.class);
     String basePath = Preconditions.checkNotNull(conf.get(PROP_STORE_PATH),
       "base path should be specified in the properties.xml");
     TFileImpl hdsFile = new TFileImpl.DTFileImpl();
     basePath += System.currentTimeMillis();
     hdsFile.setBasePath(basePath);
-
     store.setFileStore(hdsFile);
+
     dag.setAttribute(store, Context.OperatorContext.COUNTERS_AGGREGATOR,
     new BasicCounters.LongAggregator<MutableLong>());
     store.setConfigurationSchemaJSON(dcSchema);
@@ -91,13 +98,15 @@ public class NYCTrafficAnalysisApp implements StreamingApplication
     URI queryUri = ConfigUtil.getAppDataQueryPubSubURI(dag, conf);
     logger.info("QueryUri: {}", queryUri);
     query.setUri(queryUri);
-    //use the EmbeddableQueryInfoProvider instead to get rid of the problem of query schema when latency is very long
+    //query.setTopic("Query Topic");
+    //using the EmbeddableQueryInfoProvider instead to get rid of the problem of query schema when latency is very long
     store.setEmbeddableQueryInfoProvider(query);
 
     //Query Result
     PubSubWebSocketAppDataResult queryResult = createAppDataResult();
-    dag.addOperator("QueryResult", queryResult);
     queryResult.setUri(queryUri);
+    //queryResult.setTopic("Result Topic");
+    dag.addOperator("QueryResult", queryResult);
 
     //Set remaining dag options
     dag.setAttribute(store, Context.OperatorContext.COUNTERS_AGGREGATOR,

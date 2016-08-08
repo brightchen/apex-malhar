@@ -59,13 +59,14 @@ public class POJOobject {
         this.fare = fare;
     }
 
-//    public void setTime(long time)
-//    {
-//        this.time = time;
-//    }
-//
     public long getTime()
     {
-        return System.currentTimeMillis();
+        return time;
     }
+
+    public void setTime(long time)
+    {
+        this.time = time;
+    }
+
 }
