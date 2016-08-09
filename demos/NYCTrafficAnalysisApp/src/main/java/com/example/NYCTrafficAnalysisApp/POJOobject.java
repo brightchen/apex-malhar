@@ -1,6 +1,9 @@
 package com.example.NYCTrafficAnalysisApp;
 
 import java.util.Date;
+import java.text.SimpleDateFormat;
+import java.text.ParseException;
+import java.util.TimeZone;
 
 /**
  * Created by aayushi on 7/7/16.
@@ -16,7 +19,7 @@ public class POJOobject {
     @Override
     public String toString()
     {
-        return "POJOobject [pickup=" + pickup + /*", dropoff=" + dropoff + */ ", cartype=" + cartype + ", fare=" + fare + ", time=" + time + "]";
+        return "POJOobject [pickup=" + pickup + /*", dropoff=" + dropoff + */ ", cartype=" + cartype + ", time=" + time + ", fare=" + fare + "]";
     }
 
     public String getPickup()
@@ -64,9 +67,17 @@ public class POJOobject {
         return time;
     }
 
-    public void setTime(long time)
+    public void setTime(String time) throws ParseException
     {
-        this.time = time;
+        SimpleDateFormat formatter = new SimpleDateFormat("MM/dd/yy HH:mm");
+        //formatter.setTimeZone(TimeZone.getTimeZone("GMT-5"));
+        Date parsedTime = formatter.parse(time);
+        this.time = parsedTime.getTime();
     }
+
+//    public void setTime(Date time)
+//    {
+//     this.time = time.toString();
+//    }
 
 }

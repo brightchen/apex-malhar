@@ -15,6 +15,10 @@
       "type": "String"
     },
     {
+      "name": "Time",
+      "type": "String"
+    },
+    {
       "name": "Fare",
       "type": "INTEGER"
     }
