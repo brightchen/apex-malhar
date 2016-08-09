@@ -5,8 +5,6 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.apex.malhar.lib.state.spillable.SpillableByteArrayListMultimapImpl;
-
 import com.datatorrent.lib.appdata.gpo.GPOUtils;
 import com.datatorrent.netlet.util.Slice;
 
@@ -18,14 +16,13 @@ public class LVBufferTester
   public void testStringSerialize()
   {
     String[] strs = new String[]{"123", "45678", "abcdef"};
-    SerdeStringSlice serde1 = new SerdeStringSlice();
+    SerdeStringSlice serde = new SerdeStringSlice();
     for(int i=0; i<3; ++i) {
       for(String str : strs) {
-        Slice slice = serde1.serialize(str);
-        String str1 = serde1.deserialize(slice);
+        Slice slice = serde.serialize(str);
+        String str1 = serde.deserialize(slice);
         Assert.assertTrue(str.equals(str1));
       }
-      serde1.buffer.reset();
     }
   }
   
@@ -35,15 +32,15 @@ public class LVBufferTester
   {
     int loopCount = 10000000;
     String[] strs = new String[]{"123", "45678", "abcdef", "dfaqecdgr"};
-    SerdeStringSlice serde1 = new SerdeStringSlice();
+    SerdeStringWithLVBuffer serde = new SerdeStringWithLVBuffer();
     
     long startTime = System.currentTimeMillis();
     for(int i=0; i<loopCount; ++i) {
       for(String str : strs) {
-        serde1.serialize(str);
+        serde.serialize(str);
       }
       if(loopCount % 1000000 == 0)
-        serde1.buffer.reset();
+        serde.reset();
     }
     long spentTime = System.currentTimeMillis() - startTime;
     
