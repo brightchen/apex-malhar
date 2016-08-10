@@ -13,7 +13,7 @@ public class POJOobject {
     private String pickup;
     private String dropoff;
     private String cartype;
-    private int fare;
+    private double fare;
     private long time;
 
     @Override
@@ -52,28 +52,33 @@ public class POJOobject {
         this.cartype = cartype;
     }
 
-    public int getFare()
+    public double getFare()
     {
         return fare;
     }
 
-    public void setFare(int fare)
+    public void setFare(double fare)
     {
         this.fare = fare;
     }
 
     public long getTime()
     {
-        return time;
+        return time = System.currentTimeMillis();
     }
+//
+//    public void setTime(long time)
+//    {
+//     this.time = System.currentTimeMillis();
+//    }
 
-    public void setTime(String time) throws ParseException
-    {
-        SimpleDateFormat formatter = new SimpleDateFormat("MM/dd/yy HH:mm");
-        //formatter.setTimeZone(TimeZone.getTimeZone("GMT-5"));
-        Date parsedTime = formatter.parse(time);
-        this.time = parsedTime.getTime();
-    }
+//    public void setTime(String time) throws ParseException
+//    {
+//        SimpleDateFormat formatter = new SimpleDateFormat("MM/dd/yy HH:mm");
+//        //formatter.setTimeZone(TimeZone.getTimeZone("GMT-5"));
+//        Date parsedTime = formatter.parse(time);
+//        this.time = parsedTime.getTime();
+//    }
 
 //    public void setTime(Date time)
 //    {
