@@ -14,7 +14,7 @@ import com.datatorrent.netlet.util.Slice;
  * keep the information of one block
  *
  */
-public class BlockBuffer
+public class BlockBuffer implements BufferStream
 {
   public static transient final Logger logger = LoggerFactory.getLogger(BlockBuffer.class);
       
@@ -45,12 +45,12 @@ public class BlockBuffer
   }
   
   /**
-   * check the buffer size and reallocate if buffer is not enought
+   * check the buffer size and reallocate if buffer is not enough
    * @param length
    */
   protected void checkOrReallocateBuffer(int length)
   {
-    if(size + length < capacity) {
+    if(size + length <= capacity) {
       return;
     }
     
@@ -93,6 +93,9 @@ public class BlockBuffer
    */
   public Slice toSlice()
   {
+    if(size == objectBeginOffset) {
+      throw new RuntimeException("data size is zero.");
+    }
     Slice slice = new Slice(buffer, objectBeginOffset, size - objectBeginOffset);
     slices.add(slice);
     //prepare for next object

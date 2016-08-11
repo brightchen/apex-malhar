@@ -8,25 +8,24 @@ import com.datatorrent.netlet.util.Slice;
 
 /**
  * A stream implemented by an array of block ( or a map from index to block )
- *
+ * BlockBuffer can reallocate the memory and copy the data if buffer is not enough
+ * But it is not the good solution if there already have slices output.
+ * BlockStream try to avoid copy the data which already output slices
+ * 
  */
-public class BlockStream
+public class BlockStream implements BufferStream
 {
-  public static final int DEFAULT_BLOCK_SIZE = 64-000-000;
+  public static final int DEFAULT_BLOCK_SIZE = 1000000;
   
   //the initial size of each block
   protected final int blockSize;
   
-  protected Map<Integer, BlockBuffer> blocks = Maps.newHashMap();
+  protected Map<Integer, FixedBlockBuffer> blocks = Maps.newHashMap();
   //the index of current block
-  protected int blockIndex = -1;
-  
-  //each writing should only limit in one block.
-  //the begin offset for current writing
-  protected int objectBeginOffset = 0;
-  //the length for current writing
-  protected int objectLength = 0;
+  protected int blockIndex = 0;
   protected int size = 0;
+  
+  protected FixedBlockBuffer currentBlock;
   
   public BlockStream()
   {
@@ -38,6 +37,7 @@ public class BlockStream
     this.blockSize = blockSize;
   }
   
+  @Override
   public void write(byte[] data)
   {
     write(data, 0, data.length);
@@ -50,39 +50,40 @@ public class BlockStream
    * @param offset
    * @param length
    */
+  @Override
   public void write(byte[] data, final int offset, final int length)
   {
-    if(length > blockSize) {
-      throw new IllegalArgumentException("The data length is large than the block size. data length: " + length + "; block size: " + blockSize);
-    }
-    if(blockIndex < 0) {
-      blockIndex = 0;
-    }
-    
     //start with a block which at least can hold current data
-    BlockBuffer workBlock = getOrCreateCurrentBlock();
-    if(!workBlock.hasEnoughSpace(length)) {
-      workBlock = moveToNextBlock();
+    currentBlock = getOrCreateCurrentBlock();
+    
+    try {
+      currentBlock.write(data, offset, length);
+    } catch (FixedBlockBuffer.OutOfBlockBufferMemoryException e) {
+      //use next block
+      FixedBlockBuffer newWorkBlock = moveToNextBlock();
+      currentBlock.moveLastObjectDataTo(newWorkBlock);
+      newWorkBlock.write(data, offset, length);
+      currentBlock = newWorkBlock;
     }
-    workBlock.write(data, offset, length);
   }
   
-  protected BlockBuffer moveToNextBlock()
+  protected FixedBlockBuffer moveToNextBlock()
   {
     ++blockIndex;
     return getOrCreateCurrentBlock();
   }
   
-  protected BlockBuffer getOrCreateCurrentBlock()
+  protected FixedBlockBuffer getOrCreateCurrentBlock()
   {
-    BlockBuffer block = blocks.get(blockIndex);
+    FixedBlockBuffer block = blocks.get(blockIndex);
     if(block == null) {
-      block = new BlockBuffer(blockSize);
+      block = new FixedBlockBuffer(blockSize);
       blocks.put(blockIndex, block);
     }
     return block;
   }
   
+  @Override
   public int size()
   {
     return size;
@@ -92,8 +93,23 @@ public class BlockStream
    * 
    * this is the last call which represent the end of an object
    */
+  @Override
   public Slice toSlice()
   {
-    return null;
+    return blocks.get(blockIndex).toSlice();
   }
+  
+  /**
+   * Don't need to maintain original buffer now.
+   */
+  @Override
+  public void reset()
+  {
+    blockIndex = 0;
+    size = 0;
+    for(FixedBlockBuffer block : blocks.values()) {
+      block.reset();
+    }
+  }
+  
 }
