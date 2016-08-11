@@ -54,7 +54,7 @@ public class NYCTrafficAnalysisApp implements StreamingApplication
     //PubSubWebSocketAppDataQuery query = dag.addOperator("Query", PubSubWebSocketAppDataQuery.class);
     //PubSubWebSocketAppDataResult queryResult = dag.addOperator("QueryResult", PubSubWebSocketAppDataResult.class);
 
-    reader.setDirectory("/user/aayushi/temp");
+    reader.setDirectory("/user/aayushi/testfiles");
     parser.setSchema(csvSchema);
 
     //Dimension Computation

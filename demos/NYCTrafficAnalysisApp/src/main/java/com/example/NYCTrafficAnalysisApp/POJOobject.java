@@ -64,20 +64,26 @@ public class POJOobject {
 
     public long getTime()
     {
-        return time = System.currentTimeMillis();
+     return time;
     }
+
+    public void setTime(String time) throws ParseException
+    {
+        SimpleDateFormat formatter = new SimpleDateFormat("MM/dd/yy HH:mm");
+        //formatter.setTimeZone(TimeZone.getTimeZone("GMT-5"));
+        Date parsedTime = formatter.parse(time);
+        this.time = parsedTime.getTime();
+    }
+
+//    public long getTime()
+//    {
+//        return time = System.currentTimeMillis();
+//    }
+
 //
 //    public void setTime(long time)
 //    {
 //     this.time = System.currentTimeMillis();
-//    }
-
-//    public void setTime(String time) throws ParseException
-//    {
-//        SimpleDateFormat formatter = new SimpleDateFormat("MM/dd/yy HH:mm");
-//        //formatter.setTimeZone(TimeZone.getTimeZone("GMT-5"));
-//        Date parsedTime = formatter.parse(time);
-//        this.time = parsedTime.getTime();
 //    }
 
 //    public void setTime(Date time)
