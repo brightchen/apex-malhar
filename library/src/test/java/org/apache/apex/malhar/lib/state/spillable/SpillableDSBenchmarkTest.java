@@ -3,6 +3,7 @@ package org.apache.apex.malhar.lib.state.spillable;
 import java.io.IOException;
 import java.util.Map;
 
+import org.junit.Rule;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,9 +18,12 @@ import com.google.common.collect.Maps;
 import com.datatorrent.lib.fileaccess.TFileImpl;
 import com.datatorrent.netlet.util.Slice;
 
-public class SpillableDSBenchmarkTest  extends SpillableByteArrayListMultimapImplTest
+public class SpillableDSBenchmarkTest
 {
   public static transient final Logger logger = LoggerFactory.getLogger(SpillableDSBenchmarkTest.class);
+ 
+  @Rule
+  public SpillableTestUtils.TestMeta testMeta = new SpillableTestUtils.TestMeta();
   
   public static class OptimisedStateStore extends ManagedStateSpillableStateStore
   {
@@ -146,16 +150,6 @@ public class SpillableDSBenchmarkTest  extends SpillableByteArrayListMultimapImp
     long spentTime = System.currentTimeMillis() - startTime;
     
     logger.info("Spent {} mills for {} operation. average: {}", spentTime, strs.length*loopCount, strs.length*loopCount/spentTime);
-  }
-  
-  @Override
-  public void simpleMultiKeyManagedStateTest()
-  {
-  }
-  
-  @Override
-  public void recoveryTestWithManagedState()
-  {
   }
   
   public void checkEnvironment()
