@@ -54,7 +54,7 @@ public class NYCTrafficAnalysisApp implements StreamingApplication
     //PubSubWebSocketAppDataQuery query = dag.addOperator("Query", PubSubWebSocketAppDataQuery.class);
     //PubSubWebSocketAppDataResult queryResult = dag.addOperator("QueryResult", PubSubWebSocketAppDataResult.class);
 
-    reader.setDirectory("/user/aayushi/testfiles");
+    reader.setDirectory("/user/aayushi/datasets");
     parser.setSchema(csvSchema);
 
     //Dimension Computation
@@ -64,16 +64,14 @@ public class NYCTrafficAnalysisApp implements StreamingApplication
     //Key expression
     {
       Map<String, String> keyToExpression = Maps.newHashMap();
-      keyToExpression.put("pickup", "getPickup()");
-      keyToExpression.put("cartype", "getCartype()");
-      keyToExpression.put("time", "getTime()");
+      keyToExpression.put("pickup_datetime", "getPickup_datetime()");
       dimensions.setKeyToExpression(keyToExpression);
     }
 
     //Aggregate expression
     {
       Map<String, String> aggregateToExpression = Maps.newHashMap();
-      aggregateToExpression.put("fare", "getFare()");
+      aggregateToExpression.put("total_amount", "getTotal_amount()");
       dimensions.setAggregateToExpression(aggregateToExpression);
     }
 
