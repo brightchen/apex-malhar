@@ -54,7 +54,7 @@ public class NYCTrafficAnalysisApp implements StreamingApplication
     //PubSubWebSocketAppDataQuery query = dag.addOperator("Query", PubSubWebSocketAppDataQuery.class);
     //PubSubWebSocketAppDataResult queryResult = dag.addOperator("QueryResult", PubSubWebSocketAppDataResult.class);
 
-    reader.setDirectory("/user/aayushi/datasets");
+    reader.setDirectory("/Users/aayushi/datasets");
     parser.setSchema(csvSchema);
 
     //Dimension Computation
@@ -64,7 +64,7 @@ public class NYCTrafficAnalysisApp implements StreamingApplication
     //Key expression
     {
       Map<String, String> keyToExpression = Maps.newHashMap();
-      keyToExpression.put("pickup_datetime", "getPickup_datetime()");
+      keyToExpression.put("time", "getPickup_datetime()");
       dimensions.setKeyToExpression(keyToExpression);
     }
 
