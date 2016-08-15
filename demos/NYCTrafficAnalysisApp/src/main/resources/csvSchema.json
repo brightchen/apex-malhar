@@ -3,20 +3,80 @@
   "quoteChar":"\"",
   "fields": [
     {
-      "name": "Pickup",
+      "name": "vendor_id",
+      "type": "Integer"
+    },
+    {
+      "name": "pickup_datetime",
       "type": "String"
     },
     {
-      "name": "Dropoff",
+      "name": "dropoff_datetime",
       "type": "String"
     },
     {
-      "name": "Cartype",
+      "name": "passenger_count",
+      "type": "Integer"
+    },
+    {
+      "name": "trip_distance",
+      "type": "Double"
+    },
+    {
+      "name": "pickup_longitude",
+      "type": "Double"
+    },
+    {
+      "name": "pickup_latitude",
+      "type": "Double"
+    },
+    {
+      "name": "rate_code_id",
+      "type": "Integer"
+    },
+    {
+      "name": "store_and_fwd_flag",
       "type": "String"
     },
     {
-      "name": "Fare",
-      "type": "INTEGER"
+      "name": "dropoff_longitude",
+      "type": "Double"
+    },
+    {
+      "name": "dropoff_latitude",
+      "type": "Double"
+    },
+    {
+      "name": "payment_type",
+      "type": "Integer"
+    },
+    {
+      "name": "fare_amount",
+      "type": "Double"
+    },
+    {
+      "name": "extra",
+      "type": "Double"
+    },
+    {
+      "name": "mta_tax",
+      "type": "Double"
+    },
+    {
+      "name": "tip_amount",
+      "type": "Double"
+    },
+    {
+      "name": "tolls_amount",
+      "type": "Double"
+    },
+    {
+      "name": "improvement_surcharge",
+      "type": "Double"
+    },
+    {
+      "name": "total_amount",
+      "type": "Double"
     }
   ]
 }

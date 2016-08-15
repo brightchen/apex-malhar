@@ -24,9 +24,12 @@ import org.apache.hadoop.classification.InterfaceStability;
 import com.google.common.annotations.VisibleForTesting;
 
 import com.datatorrent.api.AutoMetric;
+import com.datatorrent.api.Context;
 import com.datatorrent.api.Context.OperatorContext;
 import com.datatorrent.api.DefaultOutputPort;
 import com.example.NYCTrafficAnalysisApp.DelimitedSchema.Field;
+
+import com.datatorrent.api.annotation.OutputPortFieldAnnotation;
 import com.datatorrent.lib.parser.Parser;
 import com.datatorrent.lib.util.KeyValPair;
 import com.datatorrent.lib.util.ReusableStringReader;
@@ -107,11 +110,15 @@ public class CsvParser extends Parser<byte[], KeyValPair<String, String>>
     @AutoMetric
     long parsedOutputCount;
 
+    @AutoMetric
+    long dupEmittedObjectCount;
+
     @Override
     public void beginWindow(long windowId)
     {
         super.beginWindow(windowId);
         parsedOutputCount = 0;
+        dupEmittedObjectCount = 0;
     }
 
     @Override
@@ -166,6 +173,13 @@ public class CsvParser extends Parser<byte[], KeyValPair<String, String>>
                 Object obj = csvBeanReader.read(clazz, nameMapping, processors);
                 out.emit(obj);
                 emittedObjectCount++;
+            }
+
+            if (outDup.isConnected() && clazz != null) {
+                csvStringReader.open(incomingString);
+                Object objDup = csvBeanReader.read(clazz, nameMapping, processors);
+                outDup.emit(objDup);
+                dupEmittedObjectCount++;
             }
 
         } catch (SuperCsvException | IOException | IllegalArgumentException e) {
@@ -272,4 +286,12 @@ public class CsvParser extends Parser<byte[], KeyValPair<String, String>>
     public final transient DefaultOutputPort<Map<String, Object>> parsedOutput = new DefaultOutputPort<Map<String, Object>>();
     private static final Logger logger = LoggerFactory.getLogger(CsvParser.class);
 
+    @OutputPortFieldAnnotation(schemaRequired = true)
+    public transient DefaultOutputPort<Object> outDup = new DefaultOutputPort<Object>()
+    {
+        public void setup(Context.PortContext context)
+        {
+            clazz = context.getValue(Context.PortContext.TUPLE_CLASS);
+        }
+    };
 }

@@ -25,6 +25,7 @@
     <name>dt.application.NYCTrafficAnalysisApp.operator.StoreHDHT.fileStore.basePathPrefix</name>
     <value>CS/Store</value>
   </property>
+<<<<<<< HEAD
   <property>
     <name>dt.application.NYCTrafficAnalysisApp.operator.StoreHDHT.embeddableQueryInfoProvider.topic</name>
     <value>CSTopic-${dt.attr.APPLICATION_NAME}</value>
@@ -32,6 +33,19 @@
   <property>
     <name>dt.application.NYCTrafficAnalysisApp.operator.QueryResult.topic</name>
     <value>QueryResult-${dt.attr.APPLICATION_NAME}</value>
+=======
+  <!--<property>-->
+  <!--<name>dt.gateway.listenAddress</name>-->
+  <!--<value>node0.morado.com:9099</value>-->
+  <!--</property>-->
+  <property>
+    <name>dt.application.NYCTrafficAnalysisApp.operator.StoreHDHT.embeddableQueryInfoProvider.topic</name>
+    <value>Topic</value>
+  </property>
+  <property>
+    <name>dt.application.NYCTrafficAnalysisApp.operator.QueryResult.topic</name>
+    <value>Result Topic</value>
+>>>>>>> 21d767ab3e3032b62a74280e5aaa47538fcb3997
   </property>
 
 </configuration>

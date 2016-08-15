@@ -1,0 +1,13 @@
+{"keys":
+  [
+  ],
+  "timeBuckets":["1m","1h","1d"],
+  "values":
+  [
+    {"name":"total_amount","type":"double","aggregators":["SUM","MAX"]}
+  ],
+  "dimensions":
+  [
+    {"combination":[]}
+  ]
+}

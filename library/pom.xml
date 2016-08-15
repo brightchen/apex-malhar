@@ -340,9 +340,15 @@
       <version>1.0.0</version>
     </dependency>
     <dependency>
+<<<<<<< HEAD
       <groupId>com.amazonaws</groupId>
       <artifactId>aws-java-sdk-s3</artifactId>
       <version>1.10.73</version>
+=======
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-all</artifactId>
+      <version>1.8.5</version>
+>>>>>>> 21d767ab3e3032b62a74280e5aaa47538fcb3997
       <scope>test</scope>
     </dependency>
   </dependencies>
