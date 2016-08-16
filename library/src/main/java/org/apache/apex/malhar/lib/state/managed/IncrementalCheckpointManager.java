@@ -120,33 +120,33 @@ public class IncrementalCheckpointManager extends FSWindowDataManager
 
   protected void transferWindowFiles()
   {
-    try {
-      Long windowId = windowsToTransfer.poll();
-      if (windowId != null) {
-        try {
-          LOG.debug("transfer window {}", windowId);
-          //bucket id => bucket data(key => value, time-buckets)
-          Map<Long, Map<Slice, Bucket.BucketedValue>> buckets = savedWindows.remove(windowId);
-
-          for (Map.Entry<Long, Map<Slice, Bucket.BucketedValue>> singleBucket : buckets.entrySet()) {
-            managedStateContext.getBucketsFileSystem().writeBucketData(windowId, singleBucket.getKey(),
-                singleBucket.getValue());
-          }
-          storageAgent.delete(managedStateContext.getOperatorContext().getId(), windowId);
-        } catch (Throwable t) {
-          throwable.set(t);
-          LOG.debug("transfer window {}", windowId, t);
-          Throwables.propagate(t);
-        }
-
-        this.lastTransferredWindow = windowId;
-      } else {
-        Thread.sleep(waitMillis);
-      }
-    } catch (InterruptedException ex) {
-      //sleep can be interrupted by teardown so no need to re-throw interrupt exception
-      LOG.debug("interrupted", ex);
-    }
+//    try {
+//      Long windowId = windowsToTransfer.poll();
+//      if (windowId != null) {
+//        try {
+//          LOG.info("transfer window {}", windowId);
+//          //bucket id => bucket data(key => value, time-buckets)
+//          Map<Long, Map<Slice, Bucket.BucketedValue>> buckets = savedWindows.remove(windowId);
+//
+//          for (Map.Entry<Long, Map<Slice, Bucket.BucketedValue>> singleBucket : buckets.entrySet()) {
+//            managedStateContext.getBucketsFileSystem().writeBucketData(windowId, singleBucket.getKey(),
+//                singleBucket.getValue());
+//          }
+//          storageAgent.delete(managedStateContext.getOperatorContext().getId(), windowId);
+//        } catch (Throwable t) {
+//          throwable.set(t);
+//          LOG.debug("transfer window {}", windowId, t);
+//          Throwables.propagate(t);
+//        }
+//
+//        this.lastTransferredWindow = windowId;
+//      } else {
+//        Thread.sleep(waitMillis);
+//      }
+//    } catch (InterruptedException ex) {
+//      //sleep can be interrupted by teardown so no need to re-throw interrupt exception
+//      LOG.debug("interrupted", ex);
+//    }
   }
 
   @Override

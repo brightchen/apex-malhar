@@ -356,6 +356,13 @@ public abstract class AbstractManagedStateImpl
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
+      
+      //assume write data is done, commented transfer file
+      //if any asyn operation depended the bucket data, it need to have a notify when the data is not used in order to clear the buffer
+      for (Map<Slice, Bucket.BucketedValue> flashDataForBucket : flashData.values()) {
+        flashDataForBucket.clear();
+      }
+      flashData.clear();
     }
   }
 

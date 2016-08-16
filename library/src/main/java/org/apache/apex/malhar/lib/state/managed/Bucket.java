@@ -403,7 +403,6 @@ public interface Bucket extends ManagedStateComponent
     {
       long memoryFreed = 0;
       Long clearWindowId;
-
       while ((clearWindowId = committedData.floorKey(windowId)) != null) {
         Map<Slice, BucketedValue> windowData = committedData.remove(clearWindowId);
 

@@ -18,37 +18,52 @@
  */
 package org.apache.apex.malhar.lib.utils.serde;
 
-import org.apache.commons.lang3.mutable.MutableInt;
-import org.apache.hadoop.classification.InterfaceStability;
-
-import com.datatorrent.lib.appdata.gpo.GPOUtils;
 import com.datatorrent.netlet.util.Slice;
 
-/**
- * An implementation of {@link Serde} which serializes and deserializes {@link String}s.
- */
-@InterfaceStability.Evolving
-public class SerdeStringSlice implements Serde<String, Slice>
+public interface SerializeBuffer
 {
-  @Override
-  public Slice serialize(String object)
-  {
-    return new Slice(GPOUtils.serializeString(object));
-  }
+  /**
+   * write value. it could be part of the value
+   * @param value
+   */
+  public void write(byte[] value);
+
+  
+  /**
+   * write value. it could be part of the value
+   * 
+   * @param value
+   * @param offset
+   * @param length
+   */
+  public void write(byte[] value, int offset, int length);
+
 
   /**
-   * The slice could be a buffer of multiple objects, 
-   * We should not assume deserialize whole slice, the offset indicates where to start.
+   * set value and length. the input value is value only, it doesn't include
+   * length information.
+   * 
+   * @param value
+   * @param offset
+   * @param length
    */
-  @Override
-  public String deserialize(Slice object, MutableInt offset)
-  {
-    return GPOUtils.deserializeString(object.buffer, offset);
-  }
+  public void setObjectByValue(byte[] value, int offset, int length);
 
-  @Override
-  public String deserialize(Slice object)
-  {
-    return deserialize(object, new MutableInt(object.offset));
-  }
+
+  public void setObjectByValue(byte[] value);
+  
+  /**
+   * reset the environment to reuse the resource.
+   */
+  public void reset();
+  
+  public void release();
+  
+  /**
+   * This method should be called only the whole object has been written
+   * @return The slice which represents the object
+   */
+  public Slice toSlice();
+  
+  
 }
