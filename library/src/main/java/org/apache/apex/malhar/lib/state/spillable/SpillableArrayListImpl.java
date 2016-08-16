@@ -25,9 +25,12 @@ import java.util.ListIterator;
 
 import javax.validation.constraints.NotNull;
 
+import org.apache.apex.malhar.lib.utils.serde.LengthValueBuffer;
+import org.apache.apex.malhar.lib.utils.serde.SerToSerializeBuffer;
 import org.apache.apex.malhar.lib.utils.serde.Serde;
 import org.apache.apex.malhar.lib.utils.serde.SerdeIntSlice;
 import org.apache.apex.malhar.lib.utils.serde.SerdeListSlice;
+import org.apache.apex.malhar.lib.utils.serde.SerdeListSliceWithSerializeBuffer;
 import org.apache.hadoop.classification.InterfaceStability;
 
 import com.esotericsoftware.kryo.DefaultSerializer;
@@ -65,6 +68,16 @@ public class SpillableArrayListImpl<T> implements Spillable.SpillableArrayList<T
   private int size;
   private int numBatches;
 
+  /**
+   * The created value serde depend on the item serde. 
+   * If the item serde implemented SerToSerializeBuffer, create SerdeListSliceWithSerializeBuffer;
+   * else create SerdeListSlice;
+   */
+  protected transient SerdeListSliceWithSerializeBuffer<T> valueSerdeToBuffer;
+  protected transient SerdeListSlice<T> valueSerde;
+  
+  protected transient LengthValueBuffer buffer;
+  
   private SpillableArrayListImpl()
   {
     //for kryo
@@ -87,12 +100,7 @@ public class SpillableArrayListImpl<T> implements Spillable.SpillableArrayList<T
       @NotNull SpillableStateStore store,
       @NotNull Serde<T, Slice> serde)
   {
-    this.bucketId = bucketId;
-    this.prefix = Preconditions.checkNotNull(prefix);
-    this.store = Preconditions.checkNotNull(store);
-    this.serde = Preconditions.checkNotNull(serde);
-
-    map = new SpillableByteMapImpl<>(store, prefix, bucketId, new SerdeIntSlice(), new SerdeListSlice(serde));
+    this(bucketId, prefix, store, serde, DEFAULT_BATCH_SIZE);
   }
 
   /**
@@ -112,10 +120,39 @@ public class SpillableArrayListImpl<T> implements Spillable.SpillableArrayList<T
       @NotNull Serde<T, Slice> serde,
       int batchSize)
   {
-    this(bucketId, prefix, store, serde);
+    this(bucketId, prefix, store, serde, batchSize, new LengthValueBuffer());
+  }
 
+  public SpillableArrayListImpl(long bucketId, @NotNull byte[] prefix,
+      @NotNull SpillableStateStore store,
+      @NotNull Serde<T, Slice> serde,
+      @NotNull LengthValueBuffer buffer)
+  {
+    this(bucketId, prefix, store, serde, DEFAULT_BATCH_SIZE, buffer);
+  }
+  
+  public SpillableArrayListImpl(long bucketId, @NotNull byte[] prefix, @NotNull SpillableStateStore store,
+      @NotNull Serde<T, Slice> serde, int batchSize, @NotNull LengthValueBuffer buffer)
+  {
+    this.bucketId = bucketId;
+    this.prefix = Preconditions.checkNotNull(prefix);
+    this.store = Preconditions.checkNotNull(store);
+    this.serde = Preconditions.checkNotNull(serde);
+
+    if (serde instanceof SerToSerializeBuffer) {
+      valueSerdeToBuffer = new SerdeListSliceWithSerializeBuffer<>((SerToSerializeBuffer<T>)serde, buffer);
+      map = new SpillableByteMapImpl<>(store, prefix, bucketId, new SerdeIntSlice(), valueSerdeToBuffer);
+    } else {
+      valueSerde = new SerdeListSlice<>(serde);
+      map = new SpillableByteMapImpl<>(store, prefix, bucketId, new SerdeIntSlice(), valueSerde);
+    }
+
+    
+    
     Preconditions.checkArgument(this.batchSize > 0);
     this.batchSize = batchSize;
+    
+    
   }
 
   public void setSize(int size)

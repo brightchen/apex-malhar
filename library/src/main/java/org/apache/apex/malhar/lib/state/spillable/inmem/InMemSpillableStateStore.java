@@ -24,6 +24,7 @@ import java.util.concurrent.Future;
 import javax.validation.constraints.NotNull;
 
 import org.apache.apex.malhar.lib.state.spillable.SpillableStateStore;
+import org.apache.apex.malhar.lib.utils.serde.SerializeSlice;
 import org.apache.hadoop.classification.InterfaceStability;
 
 import com.google.common.collect.Maps;
@@ -75,6 +76,15 @@ public class InMemSpillableStateStore implements SpillableStateStore
       store.put(bucketId, bucket);
     }
 
+    if (key.getClass() == Slice.class) {
+      //The hashCode of Slice was not correct, so correct it
+      key = new SerializeSlice(key);
+    }
+    if (value.getClass() == Slice.class) {
+      //The hashCode of Slice was not correct, so correct it
+      value = new SerializeSlice(value);
+    }
+    
     bucket.put(key, value);
   }
 
@@ -88,6 +98,10 @@ public class InMemSpillableStateStore implements SpillableStateStore
       store.put(bucketId, bucket);
     }
 
+    if (key.getClass() == Slice.class) {
+      //The hashCode of Slice was not correct, so correct it
+      key = new SerializeSlice(key);
+    }
     return bucket.get(key);
   }
 

@@ -26,6 +26,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import javax.validation.constraints.NotNull;
 
+import org.apache.apex.malhar.lib.utils.serde.LengthValueBuffer;
 import org.apache.apex.malhar.lib.utils.serde.PassThruByteArraySliceSerde;
 import org.apache.apex.malhar.lib.utils.serde.Serde;
 import org.apache.apex.malhar.lib.utils.serde.SerdeIntSlice;
@@ -67,6 +68,8 @@ public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.Spill
   private Serde<K, Slice> serdeKey;
   private Serde<V, Slice> serdeValue;
 
+  protected transient LengthValueBuffer buffer;
+  
   private SpillableByteArrayListMultimapImpl()
   {
     // for kryo
@@ -85,12 +88,21 @@ public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.Spill
       Serde<K, Slice> serdeKey,
       Serde<V, Slice> serdeValue)
   {
+    this(store, identifier, bucket, serdeKey, serdeValue, new LengthValueBuffer());
+  }
+  
+  public SpillableByteArrayListMultimapImpl(SpillableStateStore store, byte[] identifier, long bucket,
+      Serde<K, Slice> serdeKey,
+      Serde<V, Slice> serdeValue,
+      LengthValueBuffer buffer)
+  {
     this.store = Preconditions.checkNotNull(store);
     this.identifier = Preconditions.checkNotNull(identifier);
     this.bucket = bucket;
     this.serdeKey = Preconditions.checkNotNull(serdeKey);
     this.serdeValue = Preconditions.checkNotNull(serdeValue);
-
+    this.buffer = Preconditions.checkNotNull(buffer);
+    
     map = new SpillableByteMapImpl(store, identifier, bucket, new PassThruByteArraySliceSerde(), new SerdeIntSlice());
   }
 
@@ -118,7 +130,7 @@ public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.Spill
       }
 
       Slice keyPrefix = SliceUtils.concatenate(identifier, keySlice);
-      spillableArrayList = new SpillableArrayListImpl<V>(bucket, keyPrefix.toByteArray(), store, serdeValue);
+      spillableArrayList = new SpillableArrayListImpl<V>(bucket, keyPrefix.toByteArray(), store, serdeValue, buffer);
       spillableArrayList.setSize(size);
     }
 
@@ -201,7 +213,7 @@ public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.Spill
 
     if (spillableArrayList == null) {
       Slice keyPrefix = SliceUtils.concatenate(identifier, serdeKey.serialize(key));
-      spillableArrayList = new SpillableArrayListImpl<V>(bucket, keyPrefix.toByteArray(), store, serdeValue);
+      spillableArrayList = new SpillableArrayListImpl<V>(bucket, keyPrefix.toByteArray(), store, serdeValue, buffer);
 
       cache.put(key, spillableArrayList);
     }

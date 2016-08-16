@@ -19,43 +19,28 @@
 package org.apache.apex.malhar.lib.utils.serde;
 
 import org.apache.commons.lang3.mutable.MutableInt;
-import org.apache.hadoop.classification.InterfaceStability;
 
 import com.datatorrent.lib.appdata.gpo.GPOUtils;
 import com.datatorrent.netlet.util.Slice;
 
-/**
- * An implementation of {@link Serde} which serializes and deserializes {@link String}s.
- *
- * @since 3.5.0
- */
-@InterfaceStability.Evolving
-public class SerdeStringSlice implements Serde<String, Slice>
+public class SerdeLongSlice implements Serde<Long, Slice>
 {
   @Override
-  public Slice serialize(String object)
+  public Slice serialize(Long object)
   {
-    return new Slice(GPOUtils.serializeString(object));
-  }
-
-  /**
-   * The slice could be a buffer of multiple objects, 
-   * We should not assume deserialize whole slice, the offset indicates where to start.
-   */
-  @Override
-  public String deserialize(Slice slice, MutableInt offset)
-  {
-    //the input offset should be larger than or equal to slice's offset. 
-    //implicitly adjust it if incorrect offset, maybe better to throw exception
-    if (offset.intValue() < slice.offset) {
-      offset.setValue(slice.offset);
-    }
-    return GPOUtils.deserializeString(slice.buffer, offset);
+    return new Slice(GPOUtils.serializeLong(object));
   }
 
   @Override
-  public String deserialize(Slice object)
+  public Long deserialize(Slice slice, MutableInt offset)
   {
-    return deserialize(object, new MutableInt(object.offset));
+    return GPOUtils.deserializeLong(slice.buffer, offset);
+  }
+
+  @Override
+  public Long deserialize(Slice object)
+  {
+    return deserialize(object, new MutableInt(0));
   }
 }
+
