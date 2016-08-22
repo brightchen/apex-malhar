@@ -123,8 +123,6 @@ public class SpillableDSBenchmarkTest
     store.setup(testMeta.operatorContext);
     multiMap.setup(testMeta.operatorContext);
 
-    String[] strs = new String[]{"123", "45678", "abcdef", "dfaqecdgr"};
-
     final long startTime = System.currentTimeMillis();
 
     long windowId = 0;
@@ -150,16 +148,15 @@ public class SpillableDSBenchmarkTest
       long spentTime = System.currentTimeMillis() - startTime;
       if (spentTime > outputTimes * 60000) {
         ++outputTimes;
-        logger.info("Spent {} mills for {} operation. average: {}", spentTime, strs.length * i,
-            strs.length * i / spentTime);
+        logger.info("Spent {} mills for {} operation. average: {}", spentTime, i, i / spentTime);
         checkEnvironment();
       }
 
     }
     long spentTime = System.currentTimeMillis() - startTime;
 
-    logger.info("Spent {} mills for {} operation. average: {}", spentTime, strs.length * loopCount,
-        strs.length * loopCount / spentTime);
+    logger.info("Spent {} mills for {} operation. average: {}", spentTime, loopCount,
+        loopCount / spentTime);
   }
 
   /**
