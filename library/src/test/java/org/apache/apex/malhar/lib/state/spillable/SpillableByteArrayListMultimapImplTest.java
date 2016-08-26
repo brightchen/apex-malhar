@@ -373,9 +373,8 @@ public class SpillableByteArrayListMultimapImplTest
   public void testRemoveAll()
   {
     SpillableStateStore store = testMeta.store;
-    SpillableByteArrayListMultimapImpl<String, String> map =
-        new SpillableByteArrayListMultimapImpl<String, String>(store, ID1, 0L, new SerdeStringSlice(),
-            new SerdeStringSlice());
+    SpillableByteArrayListMultimapImpl<String, String> map = new SpillableByteArrayListMultimapImpl<String, String>(
+        store, ID1, 0L, new SerdeStringSlice(), new SerdeStringSlice());
 
     store.setup(testMeta.operatorContext);
     map.setup(testMeta.operatorContext);
