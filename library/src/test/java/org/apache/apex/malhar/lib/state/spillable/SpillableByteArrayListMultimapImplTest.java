@@ -398,8 +398,8 @@ public class SpillableByteArrayListMultimapImplTest
     Assert.assertTrue(map.containsEntry("key2", "b"));
     Assert.assertTrue(map.containsEntry("key3", "c"));
 
-    map.endWindow();
-    store.endWindow();
+    //map.endWindow();
+    //store.endWindow();
     windowId++;
 
     store.beginWindow(windowId);
@@ -409,8 +409,8 @@ public class SpillableByteArrayListMultimapImplTest
     Assert.assertFalse(map.containsKey("key1"));
     Assert.assertFalse(map.containsKey("key2"));
     Assert.assertTrue(map.containsKey("key3"));
-    map.endWindow();
-    store.endWindow();
+    //map.endWindow();
+    //store.endWindow();
     windowId++;
 
     store.beginWindow(windowId);
@@ -427,8 +427,8 @@ public class SpillableByteArrayListMultimapImplTest
       i++;
     }
     Assert.assertEquals(1, i);
-    map.endWindow();
-    store.endWindow();
+//    map.endWindow();
+//    store.endWindow();
     windowId++;
 
     Assert.assertEquals(1, map.size());
