@@ -190,6 +190,7 @@ public class DeduperPartitioningTest
     LocalMode.Controller lc = lma.getController();
     lc.runAsync();
     app.dedup.latch.await();
+    lc.shutdown();
     Assert.assertFalse(testFailed);
   }
 }

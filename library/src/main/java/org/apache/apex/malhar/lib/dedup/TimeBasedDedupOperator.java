@@ -18,11 +18,13 @@
  */
 package org.apache.apex.malhar.lib.dedup;
 
+import java.util.concurrent.Future;
+
 import javax.validation.constraints.NotNull;
 
 import org.joda.time.Duration;
 import org.joda.time.Instant;
-
+import org.apache.apex.malhar.lib.state.managed.ManagedTimeUnifiedStateImpl;
 import org.apache.apex.malhar.lib.state.managed.TimeBucketAssigner;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 
@@ -69,6 +71,8 @@ import com.datatorrent.netlet.util.Slice;
  * 2. {@link #timeExpression} - The java expression to extract the time field in the incoming tuple (POJO).
  * In case there is no time field in the tuple, system time, when the tuple is processed, will be used.
  *
+ *
+ * @since 3.5.0
  */
 @Evolving
 public class TimeBasedDedupOperator extends AbstractDeduper<Object> implements ActivationListener<Context>
@@ -95,6 +99,13 @@ public class TimeBasedDedupOperator extends AbstractDeduper<Object> implements A
 
   private transient Getter<Object, Object> keyGetter;
 
+  private transient StreamCodec<Object> streamCodec;
+
+  public TimeBasedDedupOperator()
+  {
+    managedState = new ManagedTimeUnifiedStateImpl();
+  }
+
   @InputPortFieldAnnotation(schemaRequired = true)
   public final transient DefaultInputPort<Object> input = new DefaultInputPort<Object>()
   {
@@ -102,6 +113,7 @@ public class TimeBasedDedupOperator extends AbstractDeduper<Object> implements A
     public void setup(PortContext context)
     {
       pojoClass = context.getAttributes().get(PortContext.TUPLE_CLASS);
+      streamCodec = getDeduperStreamCodec();
     }
 
     @Override
@@ -113,7 +125,7 @@ public class TimeBasedDedupOperator extends AbstractDeduper<Object> implements A
     @Override
     public StreamCodec<Object> getStreamCodec()
     {
-      return getDeduperStreamCodec();
+      return streamCodec;
     }
   };
 
@@ -130,7 +142,7 @@ public class TimeBasedDedupOperator extends AbstractDeduper<Object> implements A
   protected Slice getKey(Object tuple)
   {
     Object key = keyGetter.get(tuple);
-    return new Slice(key.toString().getBytes());
+    return streamCodec.toByteArray(key);
   }
 
   protected StreamCodec<Object> getDeduperStreamCodec()
@@ -164,6 +176,21 @@ public class TimeBasedDedupOperator extends AbstractDeduper<Object> implements A
   public void deactivate()
   {
   }
+
+  @Override
+  protected Future<Slice> getAsyncManagedState(Object tuple)
+  {
+    Future<Slice> valFuture = ((ManagedTimeUnifiedStateImpl)managedState).getAsync(getTime(tuple),
+        getKey(tuple));
+    return valFuture;
+  }
+
+  @Override
+  protected void putManagedState(Object tuple)
+  {
+    ((ManagedTimeUnifiedStateImpl)managedState).put(getTime(tuple), getKey(tuple), new Slice(new byte[0]));
+  }
+
 
   public String getKeyExpression()
   {

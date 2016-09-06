@@ -35,6 +35,8 @@ import com.google.common.collect.Sets;
  * A simple priority queue where the priority of an object is determined by the time at which it is inserted into the
  * queue. The object in the queue with the smallest time stamp is the first to be dequeued.
  * @param <T> The type of the objects inserted into the queue.
+ *
+ * @since 3.5.0
  */
 @InterfaceStability.Evolving
 public class TimeBasedPriorityQueue<T>
@@ -115,8 +117,17 @@ public class TimeBasedPriorityQueue<T>
       } else if (this.timestamp > timeWrapper.getTimestamp()) {
         return 1;
       }
-
-      return 0;
+      
+      /**
+       * NOTE: the following use the equals() to implement the compareTo() for key.
+       * it should be OK as the compareTo() only used by TimeBasedPriorityQueue.sortedTimestamp, 
+       * which only care about the order of time ( the order for key doesn't matter ).
+       * But would cause problem if add other function which depended on the order of the key.
+       * 
+       * Add compare by hashCode when not equals in order to compatible with the interface for most cases.
+       * Anyway, the order of key is not guaranteed. And we should not return 0 if not equals
+       */
+      return key.equals(timeWrapper.key) ? 0 : (hashCode() - timeWrapper.hashCode() <= 0 ? -1 : 1);
     }
 
     @Override

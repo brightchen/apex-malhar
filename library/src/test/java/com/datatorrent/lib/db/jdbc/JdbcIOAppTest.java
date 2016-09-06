@@ -121,12 +121,10 @@ public class JdbcIOAppTest
       lma.prepareDAG(new JdbcIOApp(), conf);
       LocalMode.Controller lc = lma.getController();
       lc.runAsync();
-
       // wait for records to be added to table    
       Thread.sleep(3000);
-
+      lc.shutdown();
       Assert.assertEquals("Events in store", 10, getNumOfEventsInStore());
-
     } catch (ConstraintViolationException e) {
       Assert.fail("constraint violations: " + e.getConstraintViolations());
     }

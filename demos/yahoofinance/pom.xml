@@ -31,7 +31,7 @@
   <parent>
     <groupId>org.apache.apex</groupId>
     <artifactId>malhar-demos</artifactId>
-    <version>3.5.0-SNAPSHOT</version>
+    <version>3.6.0-SNAPSHOT</version>
   </parent>
 
   <properties>
@@ -48,6 +48,17 @@
       <groupId>org.apache.derby</groupId>
       <artifactId>derby</artifactId>
       <version>10.9.1.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.apex</groupId>
+      <artifactId>malhar-contrib</artifactId>
+      <version>${project.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>*</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
   </dependencies>
 
