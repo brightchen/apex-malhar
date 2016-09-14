@@ -53,6 +53,8 @@ public class ManagedStateBenchmarkApp implements StreamingApplication
   protected static final String PROP_STORE_PATH = "dt.application.ManagedStateBenchmark.storeBasePath";
   protected static final String DEFAULT_BASE_PATH = "ManagedStateBenchmark/Store";
 
+  protected StoreOperator store;
+  
   @Override
   public void populateDAG(DAG dag, Configuration conf)
   {
@@ -63,7 +65,7 @@ public class ManagedStateBenchmarkApp implements StreamingApplication
 
     StoreOperator storeOperator = new StoreOperator();
     storeOperator.setStore(createStore(conf));
-    StoreOperator store = dag.addOperator("Store", storeOperator);
+    store = dag.addOperator("Store", storeOperator);
 
     dag.setAttribute(store, OperatorContext.STATS_LISTENERS, Lists.newArrayList((StatsListener)sl));
 

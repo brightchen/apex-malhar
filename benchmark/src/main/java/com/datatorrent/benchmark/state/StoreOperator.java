@@ -18,10 +18,17 @@
  */
 package com.datatorrent.benchmark.state;
 
+import java.util.LinkedList;
+import java.util.Map;
+import java.util.Queue;
+import java.util.concurrent.Future;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.apex.malhar.lib.state.managed.ManagedStateImpl;
+
+import com.google.common.collect.Maps;
 
 import com.datatorrent.api.Context.OperatorContext;
 import com.datatorrent.api.DefaultInputPort;
@@ -34,6 +41,13 @@ public class StoreOperator extends BaseOperator implements Operator.CheckpointNo
 {
   private static final Logger logger = LoggerFactory.getLogger(StoreOperator.class);
 
+  public static enum ExeMode
+  {
+    Insert,
+    UpdateSync,
+    UpdateAsync
+  }
+  
   protected static final int numOfWindowPerStatistics = 10;
 
   protected ManagedStateImpl store;
@@ -44,6 +58,8 @@ public class StoreOperator extends BaseOperator implements Operator.CheckpointNo
   protected long tupleCount = 0;
   protected int windowCountPerStatistics = 0;
   protected long statisticsBeginTime = 0;
+  
+  protected ExeMode exeMode = ExeMode.Insert;
 
   public final transient DefaultInputPort<KeyValPair<byte[], byte[]>> input = new DefaultInputPort<KeyValPair<byte[], byte[]>>()
   {
@@ -57,6 +73,7 @@ public class StoreOperator extends BaseOperator implements Operator.CheckpointNo
   @Override
   public void setup(OperatorContext context)
   {
+    logger.info("The execute mode is: {}", exeMode.name());
     store.setup(context);
   }
 
@@ -80,10 +97,61 @@ public class StoreOperator extends BaseOperator implements Operator.CheckpointNo
     }
   }
 
+  protected transient Queue<Future<Slice>> taskQueue = new LinkedList<Future<Slice>>();
+  protected transient Map<Future<Slice>, KeyValPair<byte[], byte[]>> taskToPair = Maps.newHashMap();
+  
   protected void processTuple(KeyValPair<byte[], byte[]> tuple)
+  {
+    if (ExeMode.UpdateAsync == exeMode) {
+      updateAsync(tuple);
+      return;
+    }
+
+    Slice key = new Slice(tuple.getKey());
+
+    if (ExeMode.UpdateSync == exeMode) {
+      store.getSync(bucketId, key);
+    }
+    insertValueToStore(tuple);
+  }
+  
+  protected final int taskBarrier = 1000000;
+  protected void updateAsync(KeyValPair<byte[], byte[]> tuple)
+  {
+    if (taskQueue.size() > taskBarrier) {
+      //slow down to avoid too much task waiting.
+      try {
+        
+        logger.info("Queue Size: {}, wait time(milli-seconds): {}", taskQueue.size(), taskQueue.size() / taskBarrier);
+        Thread.sleep(taskQueue.size() / taskBarrier);
+      } catch (Exception e) {
+        //ignore
+      }
+    }
+    
+    {
+      Slice key = new Slice(tuple.getKey());
+      Future<Slice> task = store.getAsync(bucketId, key);
+      taskQueue.add(task);
+      taskToPair.put(task, tuple);
+    }
+
+    while (!taskQueue.isEmpty()) {
+      //assume task finished in sequence.
+      if (!taskQueue.peek().isDone()) {
+        break;
+      }
+
+      Future<Slice> task = taskQueue.poll();
+      insertValueToStore(taskToPair.remove(task));
+    }
+  }
+  
+  protected void insertValueToStore(KeyValPair<byte[], byte[]> tuple)
   {
     Slice key = new Slice(tuple.getKey());
     Slice value = new Slice(tuple.getValue());
+
     store.put(bucketId, key, value);
     ++tupleCount;
   }
@@ -119,9 +187,30 @@ public class StoreOperator extends BaseOperator implements Operator.CheckpointNo
   protected void logStatistics()
   {
     long spentTime = System.currentTimeMillis() - statisticsBeginTime;
-    logger.info("Time Spent: {}, Processed tuples: {}, rate: {}", spentTime, tupleCount, tupleCount / spentTime);
+    logger.info("Time Spent: {}, Processed tuples: {}, rate per second: {}", spentTime, tupleCount, tupleCount * 1000 / spentTime);
 
     statisticsBeginTime = System.currentTimeMillis();
     tupleCount = 0;
   }
+
+  public ExeMode getExeMode()
+  {
+    return exeMode;
+  }
+
+  public void setExeMode(ExeMode exeMode)
+  {
+    this.exeMode = exeMode;
+  }
+
+  public String getExeModeString()
+  {
+    return exeMode.name();
+  }
+  
+  public void setExeModeStr(String exeModeStr)
+  {
+    this.exeMode = ExeMode.valueOf(exeModeStr);
+  }
+  
 }
