@@ -20,9 +20,6 @@ package org.apache.apex.malhar.lib.utils.serde;
 
 import java.util.List;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.google.common.collect.Lists;
 
 import com.datatorrent.netlet.util.Slice;
@@ -34,8 +31,6 @@ import com.datatorrent.netlet.util.Slice;
  */
 public class Block implements ByteStream
 {
-  public static final transient Logger logger = LoggerFactory.getLogger(Block.class);
-
   public static final int DEFAULT_BLOCK_SIZE = 1000000;
 
   //the capacity of the block

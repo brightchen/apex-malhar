@@ -92,7 +92,8 @@ public class SpillableTestOperator extends BaseOperator implements Operator.Chec
 
   public void checkData()
   {
-    logger.info("checkData(): totalCount: {}; minWinId: {}; committedWinId: {}; curWinId: {}", totalCount, this.minWinId, committedWinId, this.windowId);
+    long startTime = System.currentTimeMillis();
+    logger.debug("totalCount: {}; minWinId: {}; committedWinId: {}; curWinId: {}", totalCount, this.minWinId, committedWinId, this.windowId);
     for(long winId = Math.max(committedWinId+1, minWinId); winId < this.windowId; ++winId) {
       Long count = this.windowToCount.get(winId);
       SpillableArrayListImpl<String> datas = (SpillableArrayListImpl<String>)multiMap.get("" + winId);
@@ -107,6 +108,7 @@ public class SpillableTestOperator extends BaseOperator implements Operator.Chec
         } 
       }
     }
+    logger.debug("check data took {} millis.", System.currentTimeMillis() - startTime);
   }
   
   
@@ -135,9 +137,7 @@ public class SpillableTestOperator extends BaseOperator implements Operator.Chec
     store.endWindow();
 
     if(windowId % 10 == 0) {
-      long startTime = System.currentTimeMillis();
       checkData();
-      logger.info("checkData() took {} millis.", System.currentTimeMillis() - startTime);
     }
   }
 

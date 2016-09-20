@@ -41,11 +41,11 @@ import com.datatorrent.lib.fileaccess.TFileImpl;
 
 public class SpillableDSBenchmarkTest
 {
-  private static final transient Logger logger = LoggerFactory.getLogger(SpillableDSBenchmarkTest.class);
-  protected static final transient int loopCount = 100000000;
-  protected static final transient long oneMB = 1024*1024;
-  protected static final transient int keySize = 500000;   
-  protected static final transient int valueSize = 100000;
+  private static final Logger logger = LoggerFactory.getLogger(SpillableDSBenchmarkTest.class);
+  protected static final int loopCount = 100000000;
+  protected static final long oneMB = 1024*1024;
+  protected static final int keySize = 500000;   
+  protected static final int valueSize = 100000;
   protected static final int maxKeyLength = 100;
   protected static final int maxValueLength = 1000;
   
