@@ -32,7 +32,7 @@ import com.google.common.collect.Lists;
  */
 public class Block implements ByteStream
 {
-  public static final transient Logger logger = LoggerFactory.getLogger(Block.class);
+  private static final Logger logger = LoggerFactory.getLogger(Block.class);
 
   public static final int DEFAULT_BLOCK_SIZE = 1000000;
 
