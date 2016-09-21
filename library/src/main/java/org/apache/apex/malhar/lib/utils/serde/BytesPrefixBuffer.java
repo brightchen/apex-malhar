@@ -42,12 +42,18 @@ public class BytesPrefixBuffer extends AbstractSerializeBuffer
   public BytesPrefixBuffer(byte[] prefix)
   {
     setPrefix(prefix);
-    windowableByteStream = createWindowableByteStream();
+    setWindowableByteStream(createWindowableByteStream());
   }
       
   public BytesPrefixBuffer(byte[] prefix, int capacity)
   {
-    windowableByteStream = createWindowableByteStream(capacity);
+    setWindowableByteStream(createWindowableByteStream(capacity));
+  }
+  
+  public BytesPrefixBuffer(byte[] prefix, WindowableByteStream windowableByteStream)
+  {
+    setPrefix(prefix);
+    setWindowableByteStream(windowableByteStream);
   }
   
   /**

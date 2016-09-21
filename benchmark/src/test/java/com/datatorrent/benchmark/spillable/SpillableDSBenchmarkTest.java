@@ -27,12 +27,9 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.apex.malhar.lib.state.spillable.SpillableByteArrayListMultimapImpl;
 import org.apache.apex.malhar.lib.state.spillable.SpillableByteMapImpl;
 import org.apache.apex.malhar.lib.state.spillable.SpillableTestUtils;
 import org.apache.apex.malhar.lib.state.spillable.managed.ManagedStateSpillableStateStore;
-import org.apache.apex.malhar.lib.utils.serde.BytesPrefixBuffer;
-import org.apache.apex.malhar.lib.utils.serde.LengthValueBuffer;
 import org.apache.apex.malhar.lib.utils.serde.SerdeStringSlice;
 import org.apache.apex.malhar.lib.utils.serde.SerdeStringWithSerializeBuffer;
 
@@ -54,9 +51,6 @@ public class SpillableDSBenchmarkTest
   protected static final int commitDelays = 100;
   
   protected final transient Random random = new Random();
-  
-  protected final LengthValueBuffer buffer = new LengthValueBuffer();
-  protected final BytesPrefixBuffer keyBuffer = new BytesPrefixBuffer();
   protected String[] keys;
   protected String[] values;
   
@@ -88,7 +82,7 @@ public class SpillableDSBenchmarkTest
     SerdeStringWithSerializeBuffer keySerde = createKeySerde();
     SerdeStringSlice valueSerde = createValueSerde();
 
-    SpillableByteMapImpl<String, String> map = new SpillableByteMapImpl<String, String>(store, ID1, 0L, keySerde, valueSerde, keyBuffer);
+    SpillableByteMapImpl<String, String> map = new SpillableByteMapImpl<String, String>(store, ID1, 0L, keySerde, valueSerde);
     store.setup(testMeta.operatorContext);
     map.setup(testMeta.operatorContext);
 
@@ -109,12 +103,6 @@ public class SpillableDSBenchmarkTest
         if (i % (tuplesPerWindow * checkPointWindows) == 0) {
           store.beforeCheckpoint(windowId);
           
-          //clear the buffer
-          buffer.reset();
-          
-          keyBuffer.reset();
-          //map.resetBuffer();
-          
           //bucket cache the data group by the window. I think it's just for the cache.
           //but spillable DS already cache by object, it probably no need to cache as bytes.
           if (windowId > commitDelays) {
@@ -130,7 +118,7 @@ public class SpillableDSBenchmarkTest
       long spentTime = System.currentTimeMillis() - startTime;
       if (spentTime > outputTimes * 5000) {
         ++outputTimes;
-        logger.info("Total Statistics: Spent {} mills for {} operation. average: {}, key buffer capacity: {}, value buffer capacity: {}", spentTime, i, i / spentTime, keyBuffer.capacity(), buffer.capacity());
+        logger.info("Total Statistics: Spent {} mills for {} operation. average/second: {}", spentTime, i, i * 1000 / spentTime);
         checkEnvironment();
       }
     }
@@ -140,15 +128,7 @@ public class SpillableDSBenchmarkTest
         loopCount / spentTime);
   }
 
-  /**
-   * put the entry into the map
-   * @param multiMap
-   */
-  public void putEntry(SpillableByteArrayListMultimapImpl<String, String> multiMap)
-  {
-    multiMap.put(keys[random.nextInt(keys.length)], values[random.nextInt(values.length)]);
-  }
-  
+
   public void putEntry(SpillableByteMapImpl<String, String> map)
   {
     map.put(keys[random.nextInt(keys.length)], values[random.nextInt(values.length)]);
@@ -187,7 +167,7 @@ public class SpillableDSBenchmarkTest
 
   protected SerdeStringSlice createValueSerde()
   {
-    return new SerdeStringWithSerializeBuffer(buffer);
+    return new SerdeStringWithSerializeBuffer();
   }
 
 }

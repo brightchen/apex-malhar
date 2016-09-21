@@ -18,17 +18,9 @@
  */
 package org.apache.apex.malhar.lib.utils.serde;
 
-import com.datatorrent.netlet.util.Slice;
-
-public interface SerToSerializeBuffer<T> extends Serde<T, Slice>
+public interface KeyValueByteStreamProvider
 {
-  void serTo(T object, SerializeBuffer buffer);
+  public WindowableByteStream getKeyStream();
   
-  void reset();
-  
-  /**
-   * provide this interface so don't have to pass SerializeBuffer for each serialization
-   * @param buffer
-   */
-  void setSerializeBuffer(SerializeBuffer buffer);
+  public WindowableByteStream getValueStream();
 }

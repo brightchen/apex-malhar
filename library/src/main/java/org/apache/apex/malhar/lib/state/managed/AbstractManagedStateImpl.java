@@ -34,6 +34,9 @@ import org.joda.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.apex.malhar.lib.utils.serde.KeyValueByteStreamProvider;
+import org.apache.apex.malhar.lib.utils.serde.WindowableBlocksStream;
+
 import com.esotericsoftware.kryo.serializers.FieldSerializer;
 import com.esotericsoftware.kryo.serializers.JavaSerializer;
 import com.google.common.annotations.VisibleForTesting;
@@ -125,7 +128,7 @@ import com.datatorrent.netlet.util.Slice;
  */
 public abstract class AbstractManagedStateImpl
     implements ManagedState, Component<OperatorContext>, Operator.CheckpointNotificationListener, ManagedStateContext,
-    TimeBucketAssigner.PurgeListener
+    TimeBucketAssigner.PurgeListener, KeyValueByteStreamProvider
 {
   private long maxMemorySize;
 
@@ -173,7 +176,13 @@ public abstract class AbstractManagedStateImpl
       Multimaps.synchronizedListMultimap(ArrayListMultimap.<Long, ValueFetchTask>create());
 
   protected Bucket.ReadSource asyncReadSource = Bucket.ReadSource.ALL;
-
+  
+  //by default, separate key and value into different stream.
+  //keyStream and valueStream should created when construction(instead of setup), as the reference will be pass to serialize
+  protected WindowableBlocksStream keyStream = new WindowableBlocksStream();
+  
+  protected WindowableBlocksStream valueStream = new WindowableBlocksStream();
+  
   @Override
   public void setup(OperatorContext context)
   {
@@ -354,6 +363,9 @@ public abstract class AbstractManagedStateImpl
         throw new RuntimeException(e);
       }
     }
+    
+    keyStream.resetUpToWindow(windowId);
+    valueStream.resetUpToWindow(windowId);
   }
 
   @Override
@@ -588,6 +600,19 @@ public abstract class AbstractManagedStateImpl
   {
     this.bucketsFileSystem = Preconditions.checkNotNull(bucketsFileSystem, "buckets file system");
   }
+
+  @Override
+  public WindowableBlocksStream getKeyStream()
+  {
+    return keyStream;
+  }
+
+  @Override
+  public WindowableBlocksStream getValueStream()
+  {
+    return valueStream;
+  }
+
 
   private static final transient Logger LOG = LoggerFactory.getLogger(AbstractManagedStateImpl.class);
 }

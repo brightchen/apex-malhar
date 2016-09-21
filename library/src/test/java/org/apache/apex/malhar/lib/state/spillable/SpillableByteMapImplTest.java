@@ -23,7 +23,6 @@ import org.junit.Rule;
 import org.junit.Test;
 
 import org.apache.apex.malhar.lib.state.spillable.inmem.InMemSpillableStateStore;
-import org.apache.apex.malhar.lib.utils.serde.BytesPrefixBuffer;
 import org.apache.apex.malhar.lib.utils.serde.SerdeStringSlice;
 import org.apache.apex.malhar.lib.utils.serde.SerdeStringWithSerializeBuffer;
 
@@ -210,8 +209,8 @@ public class SpillableByteMapImplTest
     if (!useSharedBuffer) {
       return new SpillableByteMapImpl<>(store, ID1, 0L, new SerdeStringSlice(), new SerdeStringSlice());
     }
-    return new SpillableByteMapImpl<>(store, ID1, 0L, new SerdeStringWithSerializeBuffer(),
-        new SerdeStringWithSerializeBuffer(), new BytesPrefixBuffer());
+    return new SpillableByteMapImpl<String, String>(store, ID1, 0L, new SerdeStringWithSerializeBuffer(),
+        new SerdeStringWithSerializeBuffer());
   }
   
   private void simpleRemoveTestHelper(SpillableStateStore store)

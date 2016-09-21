@@ -25,6 +25,8 @@ import javax.validation.constraints.NotNull;
 
 import org.apache.apex.malhar.lib.state.spillable.SpillableStateStore;
 import org.apache.apex.malhar.lib.utils.serde.SerializeSlice;
+import org.apache.apex.malhar.lib.utils.serde.WindowableBlocksStream;
+import org.apache.apex.malhar.lib.utils.serde.WindowableByteStream;
 import org.apache.hadoop.classification.InterfaceStability;
 
 import com.google.common.collect.Maps;
@@ -42,6 +44,12 @@ public class InMemSpillableStateStore implements SpillableStateStore
 {
   private Map<Long, Map<Slice, Slice>> store = Maps.newHashMap();
 
+  //by default, separate key and value into different stream.
+  //keyStream and valueStream should created when construction(instead of setup), as the reference will be pass to serialize
+  protected WindowableBlocksStream keyStream = new WindowableBlocksStream();
+  
+  protected WindowableBlocksStream valueStream = new WindowableBlocksStream();
+  
   @Override
   public void setup(Context.OperatorContext context)
   {
@@ -130,5 +138,17 @@ public class InMemSpillableStateStore implements SpillableStateStore
   public String toString()
   {
     return store.toString();
+  }
+
+  @Override
+  public WindowableByteStream getKeyStream()
+  {
+    return keyStream;
+  }
+
+  @Override
+  public WindowableByteStream getValueStream()
+  {
+    return valueStream;
   }
 }

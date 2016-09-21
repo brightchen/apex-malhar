@@ -45,6 +45,11 @@ public class LengthValueBuffer extends AbstractSerializeBuffer
   {
     windowableByteStream = createWindowableByteStream(capacity);
   }
+  
+  public LengthValueBuffer(WindowableByteStream windowableByteStream)
+  {
+    this.windowableByteStream = windowableByteStream;
+  }
 
   /**
    * set value and length. the input value is value only, it doesn't include

@@ -135,4 +135,15 @@ public abstract class AbstractSerializeBuffer implements SerializeBuffer, Reseta
   {
     return new WindowableBlocksStream(capacity);
   }
+
+  public WindowableByteStream getWindowableByteStream()
+  {
+    return windowableByteStream;
+  }
+
+  public void setWindowableByteStream(WindowableByteStream windowableByteStream)
+  {
+    this.windowableByteStream = windowableByteStream;
+  }
+  
 }

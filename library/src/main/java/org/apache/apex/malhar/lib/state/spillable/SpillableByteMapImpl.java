@@ -27,6 +27,7 @@ import javax.validation.constraints.NotNull;
 
 import org.apache.apex.malhar.lib.state.BucketedState;
 import org.apache.apex.malhar.lib.utils.serde.BytesPrefixBuffer;
+import org.apache.apex.malhar.lib.utils.serde.LengthValueBuffer;
 import org.apache.apex.malhar.lib.utils.serde.SerToSerializeBuffer;
 import org.apache.apex.malhar.lib.utils.serde.Serde;
 import org.apache.apex.malhar.lib.utils.serde.SliceUtils;
@@ -73,7 +74,7 @@ public class SpillableByteMapImpl<K, V> implements Spillable.SpillableByteMap<K,
   private int size = 0;
 
   @NotNull
-  protected BytesPrefixBuffer buffer;
+  protected BytesPrefixBuffer keyBuffer;
   
   private SpillableByteMapImpl()
   {
@@ -99,16 +100,26 @@ public class SpillableByteMapImpl<K, V> implements Spillable.SpillableByteMap<K,
     this.serdeValue = Preconditions.checkNotNull(serdeValue);
   }
 
+  
+  /**
+   * This is the constructor used for share buffer
+   * @param store
+   * @param identifier
+   * @param bucket
+   * @param serKeyToBuffer
+   * @param serdeValue
+   * @param buffer
+   */
   public SpillableByteMapImpl(SpillableStateStore store, byte[] identifier, long bucket, SerToSerializeBuffer<K> serKeyToBuffer,
-      Serde<V, Slice> serdeValue, @NotNull BytesPrefixBuffer buffer)
+      SerToSerializeBuffer<V> serdeValue)
   {
     this.store = Preconditions.checkNotNull(store);
     this.identifier = Preconditions.checkNotNull(identifier);
     this.bucket = bucket;
     this.serKeyToBuffer = Preconditions.checkNotNull(serKeyToBuffer);
+    serdeValue.setSerializeBuffer(new LengthValueBuffer(store.getValueStream()));
     this.serdeValue = Preconditions.checkNotNull(serdeValue);
-    this.buffer = buffer;
-    this.buffer.setPrefix(identifier);
+    this.keyBuffer = new BytesPrefixBuffer(identifier, store.getKeyStream());
   }
 
 
@@ -169,8 +180,8 @@ public class SpillableByteMapImpl<K, V> implements Spillable.SpillableByteMap<K,
   protected Slice serializeKey(K key)
   {
     if (this.serKeyToBuffer != null) {
-      serKeyToBuffer.serTo(key, buffer);
-      return buffer.toSlice();
+      serKeyToBuffer.serTo(key, keyBuffer);
+      return keyBuffer.toSlice();
     }
     
     return SliceUtils.concatenate(identifier, serdeKey.serialize(key));
@@ -261,13 +272,6 @@ public class SpillableByteMapImpl<K, V> implements Spillable.SpillableByteMap<K,
     cache.endWindow();
   }
 
-  public void resetBuffer()
-  {
-    if (buffer != null) {
-      buffer.reset();
-    }
-  }
-  
   @Override
   public void teardown()
   {

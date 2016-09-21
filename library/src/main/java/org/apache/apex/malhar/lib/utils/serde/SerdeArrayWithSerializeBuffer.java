@@ -26,7 +26,7 @@ import com.datatorrent.netlet.util.Slice;
 public class SerdeArrayWithSerializeBuffer<T> implements SerToSerializeBuffer<T[]>
 {
   protected Class<T> clazz;
-  protected LengthValueBuffer buffer;
+  protected SerializeBuffer buffer;
   protected SerToSerializeBuffer<T> itemSerde;
   
   protected SerdeArrayWithSerializeBuffer()
@@ -137,6 +137,12 @@ public class SerdeArrayWithSerializeBuffer<T> implements SerToSerializeBuffer<T[
   public void setItemClass(Class<T> clazz)
   {
     this.clazz = clazz;
+  }
+
+  @Override
+  public void setSerializeBuffer(SerializeBuffer buffer)
+  {
+    this.buffer = buffer;
   }
   
 }

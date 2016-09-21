@@ -79,7 +79,8 @@ public class Block implements ByteStream
     buffer = new byte[capacity];
 
     //NOTES: it's not a good idea to move the data after expose the slices. 
-    //but if move the data, also need to change the exposed slices( we suppose client code will not cache the buffer reference
+    //use BlocksStream will not run into this issue and make the buffer will not be changed after slice(s) had exposed.
+    //but if want to use this implementation and need to move the data, probably better to change the exposed slices( we suppose client code will not cache the buffer reference
     if (size > 0) {
       System.arraycopy(oldBuffer, 0, buffer, 0, size);
 

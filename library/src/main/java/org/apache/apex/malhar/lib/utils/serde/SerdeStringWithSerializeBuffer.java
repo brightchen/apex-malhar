@@ -62,4 +62,10 @@ public class SerdeStringWithSerializeBuffer extends SerdeStringSlice implements 
       buffer.reset();
     }
   }
+
+  @Override
+  public void setSerializeBuffer(SerializeBuffer buffer)
+  {
+    this.buffer = buffer;
+  }
 }

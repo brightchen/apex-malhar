@@ -34,7 +34,7 @@ import com.datatorrent.netlet.util.Slice;
 public class SerdeListSliceWithSerializeBuffer<T> extends SerdeListSlice<T> implements SerToSerializeBuffer<List<T>>
 {
   protected SerToSerializeBuffer<T> itemSerTo;
-  protected LengthValueBuffer buffer;
+  protected SerializeBuffer buffer;
   
   private SerdeListSliceWithSerializeBuffer()
   {
@@ -56,6 +56,12 @@ public class SerdeListSliceWithSerializeBuffer<T> extends SerdeListSlice<T> impl
   }
   
   @Override
+  public void setSerializeBuffer(SerializeBuffer buffer)
+  {
+    this.buffer = buffer;
+  }
+  
+  @Override
   public void serTo(List<T> objects, SerializeBuffer buffer)
   {
     //For LengthValueBuffer, need to set the size
@@ -72,5 +78,7 @@ public class SerdeListSliceWithSerializeBuffer<T> extends SerdeListSlice<T> impl
   {
     buffer.reset();
   }
+
+
   
 }
