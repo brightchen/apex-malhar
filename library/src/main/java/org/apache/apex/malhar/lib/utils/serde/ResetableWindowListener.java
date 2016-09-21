@@ -16,23 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.apex.malhar.lib.state.spillable;
+package org.apache.apex.malhar.lib.utils.serde;
 
-import org.apache.apex.malhar.lib.state.BucketedState;
-import org.apache.apex.malhar.lib.utils.serde.KeyValueByteStreamProvider;
-import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.apex.malhar.lib.state.spillable.WindowListener;
 
-import com.datatorrent.api.Component;
-import com.datatorrent.api.Context;
-import com.datatorrent.api.Operator;
-
-/**
- * Implementations of this interface are used by Spillable datastructures to spill data to disk.
- *
- * @since 3.5.0
- */
-@InterfaceStability.Evolving
-public interface SpillableStateStore extends BucketedState, Component<Context.OperatorContext>,
-    Operator.CheckpointNotificationListener, WindowListener, KeyValueByteStreamProvider
+public interface ResetableWindowListener extends WindowListener
 {
+  /**
+   * reset for all windows which window id less or equal input windowId
+   * this interface doesn't enforce to call reset window for each windows. Several windows can be reset at the same time.
+   * @param windowId
+   */
+  void resetUpToWindow(long windowId);
 }

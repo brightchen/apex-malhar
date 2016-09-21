@@ -32,6 +32,8 @@ import javax.validation.constraints.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.apex.malhar.lib.utils.serde.SerializeSlice;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
@@ -311,6 +313,10 @@ public interface Bucket extends ManagedStateComponent
     @Override
     public Slice get(Slice key, long timeBucket, ReadSource readSource)
     {
+      if (key.getClass() == Slice.class) {
+        //The hashCode of Slice was not correct, so correct it
+        key = new SerializeSlice(key);
+      }
       switch (readSource) {
         case MEMORY:
           return getFromMemory(key);
@@ -382,6 +388,15 @@ public interface Bucket extends ManagedStateComponent
     @Override
     public void put(Slice key, long timeBucket, Slice value)
     {
+      if (key.getClass() == Slice.class) {
+        //The hashCode of Slice was not correct, so correct it
+        key = new SerializeSlice(key);
+      }
+      if (value.getClass() == Slice.class) {
+        //The hashCode of Slice was not correct, so correct it
+        value = new SerializeSlice(value);
+      }
+      
       BucketedValue bucketedValue = flash.get(key);
       if (bucketedValue == null) {
         bucketedValue = new BucketedValue();

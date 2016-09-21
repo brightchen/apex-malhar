@@ -24,6 +24,7 @@ import org.junit.Test;
 
 import org.apache.apex.malhar.lib.state.spillable.inmem.InMemSpillableStateStore;
 import org.apache.apex.malhar.lib.utils.serde.SerdeStringSlice;
+import org.apache.apex.malhar.lib.utils.serde.SerdeStringWithSerializeBuffer;
 
 import com.datatorrent.api.Attribute;
 import com.datatorrent.api.Context;
@@ -38,28 +39,46 @@ public class SpillableByteMapImplTest
 
   @Rule
   public SpillableTestUtils.TestMeta testMeta = new SpillableTestUtils.TestMeta();
+  
+  protected boolean useSharedBuffer = false;
 
   @Test
   public void simpleGetAndPutTest()
   {
     InMemSpillableStateStore store = new InMemSpillableStateStore();
 
+    useSharedBuffer = false;
     simpleGetAndPutTestHelper(store);
+
   }
 
   @Test
+  public void simpleGetAndPutWithSharedBufferTest()
+  {
+    InMemSpillableStateStore store = new InMemSpillableStateStore();
+
+    useSharedBuffer = true;
+    simpleGetAndPutTestHelper(store);
+  }
+  
+  @Test
   public void simpleGetAndPutManagedStateTest()
   {
+    useSharedBuffer = false;
     simpleGetAndPutTestHelper(testMeta.store);
   }
 
+  @Test
+  public void simpleGetAndPutManagedStateWithSharedBufferTest()
+  {
+    useSharedBuffer = true;
+    simpleGetAndPutTestHelper(testMeta.store);
+  }
+
+  
   private void simpleGetAndPutTestHelper(SpillableStateStore store)
   {
-    SerdeStringSlice sss = new SerdeStringSlice();
-
-    SpillableByteMapImpl<String, String> map = new SpillableByteMapImpl<>(store, ID1, 0L,
-        new SerdeStringSlice(),
-        new SerdeStringSlice());
+    SpillableByteMapImpl<String, String> map = createSpillableByteMap(store);
 
     store.setup(testMeta.operatorContext);
     map.setup(testMeta.operatorContext);
@@ -158,22 +177,45 @@ public class SpillableByteMapImplTest
   {
     InMemSpillableStateStore store = new InMemSpillableStateStore();
 
+    useSharedBuffer = false;
+    simpleRemoveTestHelper(store);
+  }
+  
+  @Test
+  public void simpleRemoveWithSharedBufferTest()
+  {
+    InMemSpillableStateStore store = new InMemSpillableStateStore();
+
+    useSharedBuffer = true;
     simpleRemoveTestHelper(store);
   }
 
   @Test
   public void simpleRemoveManagedStateTest()
   {
+    useSharedBuffer = false;
     simpleRemoveTestHelper(testMeta.store);
   }
 
+  @Test
+  public void simpleRemoveManagedStateWithSharedBufferTest()
+  {
+    useSharedBuffer = true;
+    simpleRemoveTestHelper(testMeta.store);
+  }
+  
+  protected SpillableByteMapImpl<String, String> createSpillableByteMap(SpillableStateStore store)
+  {
+    if (!useSharedBuffer) {
+      return new SpillableByteMapImpl<>(store, ID1, 0L, new SerdeStringSlice(), new SerdeStringSlice());
+    }
+    return new SpillableByteMapImpl<String, String>(store, ID1, 0L, new SerdeStringWithSerializeBuffer(),
+        new SerdeStringWithSerializeBuffer());
+  }
+  
   private void simpleRemoveTestHelper(SpillableStateStore store)
   {
-    SerdeStringSlice sss = new SerdeStringSlice();
-
-    SpillableByteMapImpl<String, String> map = new SpillableByteMapImpl<>(store, ID1, 0L,
-        new SerdeStringSlice(),
-        new SerdeStringSlice());
+    SpillableByteMapImpl<String, String> map = createSpillableByteMap(store);
 
     store.setup(testMeta.operatorContext);
     map.setup(testMeta.operatorContext);

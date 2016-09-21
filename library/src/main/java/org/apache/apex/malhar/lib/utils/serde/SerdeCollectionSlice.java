@@ -45,7 +45,8 @@ public class SerdeCollectionSlice<T, CollectionT extends Collection<T>> implemen
   @NotNull
   private Class<? extends CollectionT> collectionClass;
 
-  private SerdeCollectionSlice()
+  //required by sub class
+  protected SerdeCollectionSlice()
   {
     // for Kryo
   }
@@ -54,7 +55,7 @@ public class SerdeCollectionSlice<T, CollectionT extends Collection<T>> implemen
    * Creates a {@link SerdeCollectionSlice}.
    * @param serde The {@link Serde} that is used to serialize and deserialize each element of a list.
    */
-  public SerdeCollectionSlice(@NotNull Serde<T, Slice> serde, @NotNull Class<? extends CollectionT> collectionClass)
+  public SerdeCollectionSlice(@NotNull Serde<T, Slice> serde, @NotNull Class<? extends CollectionT> collectionClass /*Class<? extends C1> collectionClass*/ )
   {
     this.serde = Preconditions.checkNotNull(serde);
     this.collectionClass = Preconditions.checkNotNull(collectionClass);
@@ -116,5 +117,24 @@ public class SerdeCollectionSlice<T, CollectionT extends Collection<T>> implemen
   public CollectionT deserialize(Slice slice)
   {
     return deserialize(slice, new MutableInt(0));
+  }
+  
+  public void deserialize(Slice slice, MutableInt offset, CollectionT target)
+  {
+    MutableInt sliceOffset = new MutableInt(slice.offset + offset.intValue());
+
+    int numElements = GPOUtils.deserializeInt(slice.buffer, sliceOffset);
+    sliceOffset.subtract(slice.offset);
+    try {
+
+      for (int index = 0; index < numElements; index++) {
+        T object = serde.deserialize(slice, sliceOffset);
+        target.add(object);
+      }
+
+      offset.setValue(sliceOffset.intValue());
+    } catch (Exception ex) {
+      throw Throwables.propagate(ex);
+    }
   }
 }
