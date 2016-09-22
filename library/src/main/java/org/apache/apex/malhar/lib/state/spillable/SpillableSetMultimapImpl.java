@@ -18,6 +18,7 @@
  */
 package org.apache.apex.malhar.lib.state.spillable;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -29,7 +30,10 @@ import javax.validation.constraints.NotNull;
 import org.apache.apex.malhar.lib.utils.serde.PassThruSliceSerde;
 import org.apache.apex.malhar.lib.utils.serde.Serde;
 import org.apache.apex.malhar.lib.utils.serde.SerdeIntSlice;
+import org.apache.apex.malhar.lib.utils.serde.SerdePairSlice;
 import org.apache.apex.malhar.lib.utils.serde.SliceUtils;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.classification.InterfaceStability;
 
 import com.esotericsoftware.kryo.DefaultSerializer;
@@ -48,40 +52,38 @@ import com.datatorrent.netlet.util.Slice;
  */
 @DefaultSerializer(FieldSerializer.class)
 @InterfaceStability.Evolving
-public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.SpillableByteArrayListMultimap<K, V>,
+public class SpillableSetMultimapImpl<K, V> implements Spillable.SpillableSetMultimap<K, V>,
     Spillable.SpillableComponent
 {
   public static final int DEFAULT_BATCH_SIZE = 1000;
-  public static final byte[] SIZE_KEY_SUFFIX = new byte[]{(byte)0, (byte)0, (byte)0};
+  public static final byte[] META_KEY_SUFFIX = new byte[]{(byte)0, (byte)0, (byte)0};
 
-  private transient WindowBoundedMapCache<K, SpillableArrayListImpl<V>> cache = new WindowBoundedMapCache<>();
-  private transient boolean isRunning = false;
-  private transient boolean isInWindow = false;
+  private transient WindowBoundedMapCache<K, SpillableSetImpl<V>> cache = new WindowBoundedMapCache<>();
 
-  private int batchSize = DEFAULT_BATCH_SIZE;
   @NotNull
-  private SpillableByteMapImpl<Slice, Integer> map;
+  private SpillableByteMapImpl<Slice, Pair<Integer, V>> map;
   private SpillableStateStore store;
   private byte[] identifier;
   private long bucket;
   private Serde<K, Slice> serdeKey;
   private Serde<V, Slice> serdeValue;
+  private transient List<SpillableSetImpl<V>> removedSets = new ArrayList<>();
 
-  private SpillableByteArrayListMultimapImpl()
+  private SpillableSetMultimapImpl()
   {
     // for kryo
   }
 
   /**
-   * Creates a {@link SpillableByteArrayListMultimapImpl}.
+   * Creates a {@link SpillableSetMultimapImpl}.
    * @param store The {@link SpillableStateStore} in which to spill to.
-   * @param identifier The Id of this {@link SpillableByteArrayListMultimapImpl}.
+   * @param identifier The Id of this {@link SpillableSetMultimapImpl}.
    * @param bucket The Id of the bucket used to store this
-   * {@link SpillableByteArrayListMultimapImpl} in the provided {@link SpillableStateStore}.
+   * {@link SpillableSetMultimapImpl} in the provided {@link SpillableStateStore}.
    * @param serdeKey The {@link Serde} to use when serializing and deserializing keys.
    * @param serdeKey The {@link Serde} to use when serializing and deserializing values.
    */
-  public SpillableByteArrayListMultimapImpl(SpillableStateStore store, byte[] identifier, long bucket,
+  public SpillableSetMultimapImpl(SpillableStateStore store, byte[] identifier, long bucket,
       Serde<K, Slice> serdeKey,
       Serde<V, Slice> serdeValue)
   {
@@ -91,7 +93,7 @@ public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.Spill
     this.serdeKey = Preconditions.checkNotNull(serdeKey);
     this.serdeValue = Preconditions.checkNotNull(serdeValue);
 
-    map = new SpillableByteMapImpl(store, identifier, bucket, new PassThruSliceSerde(), new SerdeIntSlice());
+    map = new SpillableByteMapImpl(store, identifier, bucket, new PassThruSliceSerde(), new SerdePairSlice<>(new SerdeIntSlice(), serdeValue));
   }
 
   public SpillableStateStore getStore()
@@ -100,31 +102,32 @@ public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.Spill
   }
 
   @Override
-  public List<V> get(@Nullable K key)
+  public Set<V> get(@NotNull K key)
   {
     return getHelper(key);
   }
 
-  private SpillableArrayListImpl<V> getHelper(@Nullable K key)
+  private SpillableSetImpl<V> getHelper(@NotNull K key)
   {
-    SpillableArrayListImpl<V> spillableArrayList = cache.get(key);
+    SpillableSetImpl<V> spillableSet = cache.get(key);
 
-    if (spillableArrayList == null) {
+    if (spillableSet == null) {
       Slice keySlice = serdeKey.serialize(key);
-      Integer size = map.get(SliceUtils.concatenate(keySlice, SIZE_KEY_SUFFIX));
+      Pair<Integer, V> meta = map.get(SliceUtils.concatenate(keySlice, META_KEY_SUFFIX));
 
-      if (size == null) {
+      if (meta == null) {
         return null;
       }
 
       Slice keyPrefix = SliceUtils.concatenate(identifier, keySlice);
-      spillableArrayList = new SpillableArrayListImpl<V>(bucket, keyPrefix.toByteArray(), store, serdeValue);
-      spillableArrayList.setSize(size);
+      spillableSet = new SpillableSetImpl<>(bucket, keyPrefix.toByteArray(), store, serdeValue);
+      spillableSet.setSize(meta.getLeft());
+      spillableSet.setHead(meta.getRight());
     }
 
-    cache.put(key, spillableArrayList);
+    cache.put(key, spillableSet);
 
-    return spillableArrayList;
+    return spillableSet;
   }
 
   @Override
@@ -146,15 +149,29 @@ public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.Spill
   }
 
   @Override
-  public Collection<Map.Entry<K, V>> entries()
+  public Set<Map.Entry<K, V>> entries()
   {
     throw new UnsupportedOperationException();
   }
 
+  /**
+   * Note that this always returns null because the set is no longer valid after this call
+   *
+   * @param key
+   * @return null
+   */
   @Override
-  public List<V> removeAll(@Nullable Object key)
+  public Set<V> removeAll(@NotNull Object key)
   {
-    throw new UnsupportedOperationException();
+    SpillableSetImpl<V> spillableSet = getHelper((K)key);
+    if (spillableSet != null) {
+      cache.remove((K)key);
+      Slice keySlice = SliceUtils.concatenate(serdeKey.serialize((K)key), META_KEY_SUFFIX);
+      map.remove(keySlice);
+      spillableSet.clear();
+      removedSets.add(spillableSet);
+    }
+    return null;
   }
 
   @Override
@@ -177,60 +194,55 @@ public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.Spill
   }
 
   @Override
-  public boolean containsKey(@Nullable Object key)
+  public boolean containsKey(Object key)
   {
-    return cache.contains((K)key) || map.containsKey(SliceUtils.concatenate(serdeKey.serialize((K)key),
-        SIZE_KEY_SUFFIX));
+    if (cache.contains((K)key)) {
+      return true;
+    }
+    Slice keySlice = SliceUtils.concatenate(serdeKey.serialize((K)key), META_KEY_SUFFIX);
+    return map.containsKey(keySlice);
   }
 
   @Override
-  public boolean containsValue(@Nullable Object value)
+  public boolean containsValue(@NotNull Object value)
   {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public boolean containsEntry(@Nullable Object key, @Nullable Object value)
+  public boolean containsEntry(Object key, Object value)
   {
-    SpillableArrayListImpl<V> spillableArrayList = getHelper((K)key);
-    if (spillableArrayList == null) {
+    Set<V> set = get((K)key);
+    if (set == null) {
       return false;
+    } else {
+      return set.contains(value);
     }
-    for (int i = 0; i < spillableArrayList.size(); i++) {
-      V v = spillableArrayList.get(i);
-      if (v == null) {
-        if (value == null) {
-          return true;
-        }
-      } else {
-        if (v.equals(value)) {
-          return true;
-        }
-      }
-    }
-    return false;
   }
 
   @Override
-  public boolean put(@Nullable K key, @Nullable V value)
+  public boolean put(K key, V value)
   {
-    SpillableArrayListImpl<V> spillableArrayList = getHelper(key);
+    SpillableSetImpl<V> spillableSet = getHelper(key);
 
-    if (spillableArrayList == null) {
+    if (spillableSet == null) {
       Slice keyPrefix = SliceUtils.concatenate(identifier, serdeKey.serialize(key));
-      spillableArrayList = new SpillableArrayListImpl<V>(bucket, keyPrefix.toByteArray(), store, serdeValue);
-
-      cache.put(key, spillableArrayList);
+      spillableSet = new SpillableSetImpl<>(bucket, keyPrefix.toByteArray(), store, serdeValue);
+      cache.put(key, spillableSet);
     }
-
-    spillableArrayList.add(value);
+    spillableSet.add(value);
     return true;
   }
 
   @Override
-  public boolean remove(@Nullable Object key, @Nullable Object value)
+  public boolean remove(@NotNull Object key, @NotNull Object value)
   {
-    throw new UnsupportedOperationException();
+    Set<V> set = get((K)key);
+    if (set == null) {
+      return false;
+    } else {
+      return set.remove(value);
+    }
   }
 
   @Override
@@ -258,7 +270,7 @@ public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.Spill
   }
 
   @Override
-  public List<V> replaceValues(K key, Iterable<? extends V> values)
+  public Set<V> replaceValues(K key, Iterable<? extends V> values)
   {
     throw new UnsupportedOperationException();
   }
@@ -273,30 +285,30 @@ public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.Spill
   public void setup(Context.OperatorContext context)
   {
     map.setup(context);
-    isRunning = true;
   }
 
   @Override
   public void beginWindow(long windowId)
   {
     map.beginWindow(windowId);
-    isInWindow = true;
   }
 
   @Override
   public void endWindow()
   {
-    isInWindow = false;
     for (K key: cache.getChangedKeys()) {
 
-      SpillableArrayListImpl<V> spillableArrayList = cache.get(key);
-      spillableArrayList.endWindow();
+      SpillableSetImpl<V> spillableSet = cache.get(key);
+      spillableSet.endWindow();
 
-      Integer size = map.put(SliceUtils.concatenate(serdeKey.serialize(key), SIZE_KEY_SUFFIX),
-          spillableArrayList.size());
+      map.put(SliceUtils.concatenate(serdeKey.serialize(key), META_KEY_SUFFIX),
+          new ImmutablePair<>(spillableSet.size(), spillableSet.getHead()));
     }
 
-    Preconditions.checkState(cache.getRemovedKeys().isEmpty());
+    for (SpillableSetImpl removedSet : removedSets) {
+      removedSet.endWindow();
+    }
+
     cache.endWindow();
     map.endWindow();
   }
@@ -304,7 +316,6 @@ public class SpillableByteArrayListMultimapImpl<K, V> implements Spillable.Spill
   @Override
   public void teardown()
   {
-    isRunning = false;
     map.teardown();
   }
 }

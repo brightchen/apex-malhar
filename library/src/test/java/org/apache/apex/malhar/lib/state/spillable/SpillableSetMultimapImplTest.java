@@ -18,28 +18,27 @@
  */
 package org.apache.apex.malhar.lib.state.spillable;
 
-import java.util.List;
+import java.util.Iterator;
 import java.util.Random;
+import java.util.Set;
 
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 
 import org.apache.apex.malhar.lib.state.spillable.inmem.InMemSpillableStateStore;
-import org.apache.apex.malhar.lib.utils.serde.SerdeIntSlice;
 import org.apache.apex.malhar.lib.utils.serde.SerdeStringSlice;
-import org.apache.apex.malhar.lib.utils.serde.SliceUtils;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 import com.datatorrent.api.Attribute;
 import com.datatorrent.api.Context;
 import com.datatorrent.api.DAG;
 import com.datatorrent.lib.helper.OperatorContextTestHelper;
 import com.datatorrent.lib.util.KryoCloneUtils;
-import com.datatorrent.netlet.util.Slice;
 
-public class SpillableByteArrayListMultimapImplTest
+public class SpillableSetMultimapImplTest
 {
   public static final byte[] ID1 = new byte[]{(byte)0};
 
@@ -62,8 +61,8 @@ public class SpillableByteArrayListMultimapImplTest
 
   public void simpleMultiKeyTestHelper(SpillableStateStore store)
   {
-    SpillableByteArrayListMultimapImpl<String, String> map =
-        new SpillableByteArrayListMultimapImpl<String, String>(store, ID1, 0L, new SerdeStringSlice(),
+    SpillableSetMultimapImpl<String, String> map =
+        new SpillableSetMultimapImpl<>(store, ID1, 0L, new SerdeStringSlice(),
         new SerdeStringSlice());
 
     store.setup(testMeta.operatorContext);
@@ -110,15 +109,8 @@ public class SpillableByteArrayListMultimapImplTest
   }
 
   public long simpleMultiKeyTestHelper(SpillableStateStore store,
-      SpillableByteArrayListMultimapImpl<String, String> map, String key, long nextWindowId)
+      SpillableSetMultimapImpl<String, String> map, String key, long nextWindowId)
   {
-    SerdeStringSlice serdeString = new SerdeStringSlice();
-    SerdeIntSlice serdeInt = new SerdeIntSlice();
-
-    Slice keySlice = serdeString.serialize(key);
-
-    byte[] keyBytes = SliceUtils.concatenate(ID1, keySlice.toByteArray());
-
     nextWindowId++;
     store.beginWindow(nextWindowId);
     map.beginWindow(nextWindowId);
@@ -131,23 +123,11 @@ public class SpillableByteArrayListMultimapImplTest
 
     Assert.assertTrue(map.containsKey(key));
 
-    List<String> list1 = map.get(key);
-    Assert.assertEquals(1, list1.size());
+    Set<String> set1 = map.get(key);
+    Assert.assertEquals(1, set1.size());
+    Iterator<String> it = set1.iterator();
 
-    Assert.assertEquals("a", list1.get(0));
-
-    list1.addAll(Lists.newArrayList("a", "b", "c", "d", "e", "f", "g"));
-
-    Assert.assertEquals(8, list1.size());
-
-    Assert.assertEquals("a", list1.get(0));
-    Assert.assertEquals("a", list1.get(1));
-    Assert.assertEquals("b", list1.get(2));
-    Assert.assertEquals("c", list1.get(3));
-    Assert.assertEquals("d", list1.get(4));
-    Assert.assertEquals("e", list1.get(5));
-    Assert.assertEquals("f", list1.get(6));
-    Assert.assertEquals("g", list1.get(7));
+    Assert.assertEquals("a", it.next());
 
     map.endWindow();
     store.endWindow();
@@ -156,36 +136,8 @@ public class SpillableByteArrayListMultimapImplTest
     store.beginWindow(nextWindowId);
     map.beginWindow(nextWindowId);
 
-    SpillableTestUtils.checkValue(store, 0L,
-        SliceUtils.concatenate(keyBytes, SpillableByteArrayListMultimapImpl.SIZE_KEY_SUFFIX), 8, 0, serdeInt);
-
-    SpillableTestUtils.checkValue(store, 0L, keyBytes, 0, Lists.<String>newArrayList("a", "a", "b", "c", "d", "e",
-        "f", "g"));
-
-    List<String> list2 = map.get(key);
-
-    Assert.assertEquals(8, list2.size());
-
-    Assert.assertEquals("a", list2.get(0));
-    Assert.assertEquals("a", list2.get(1));
-    Assert.assertEquals("b", list2.get(2));
-    Assert.assertEquals("c", list2.get(3));
-    Assert.assertEquals("d", list2.get(4));
-    Assert.assertEquals("e", list2.get(5));
-    Assert.assertEquals("f", list2.get(6));
-    Assert.assertEquals("g", list2.get(7));
-
-    list2.add("tt");
-    list2.add("ab");
-    list2.add("99");
-    list2.add("oo");
-
-    Assert.assertEquals("tt", list2.get(8));
-    Assert.assertEquals("ab", list2.get(9));
-    Assert.assertEquals("99", list2.get(10));
-    Assert.assertEquals("oo", list2.get(11));
-
-    Assert.assertEquals(12, list2.size());
+    map.removeAll(key);
+    Assert.assertFalse(map.containsKey(key));
 
     map.endWindow();
     store.endWindow();
@@ -194,35 +146,16 @@ public class SpillableByteArrayListMultimapImplTest
     store.beginWindow(nextWindowId);
     map.beginWindow(nextWindowId);
 
-    Assert.assertEquals(12, list2.size());
+    Assert.assertFalse(map.containsKey(key));
+    map.put(key, "a");
+    set1 = map.get(key);
+    Assert.assertEquals(1, set1.size());
+    set1.addAll(Lists.newArrayList("a", "b", "c", "d", "e", "f", "g"));
+    Assert.assertEquals(7, set1.size());
 
-    SpillableTestUtils.checkValue(store, 0L,
-        SliceUtils.concatenate(keyBytes, SpillableByteArrayListMultimapImpl.SIZE_KEY_SUFFIX), 12, 0, serdeInt);
-
-    SpillableTestUtils.checkValue(store, 0L, keyBytes, 0, Lists.<String>newArrayList("a", "a", "b", "c", "d", "e",
-        "f", "g", "tt", "ab", "99", "oo"));
-
-    List<String> list3 = map.get(key);
-
-    list3.set(1, "111");
-    list3.set(3, "222");
-    list3.set(5, "333");
-    list3.set(11, "444");
-
-    Assert.assertEquals("a", list3.get(0));
-    Assert.assertEquals("111", list3.get(1));
-    Assert.assertEquals("b", list3.get(2));
-    Assert.assertEquals("222", list3.get(3));
-    Assert.assertEquals("d", list3.get(4));
-    Assert.assertEquals("333", list3.get(5));
-    Assert.assertEquals("f", list3.get(6));
-    Assert.assertEquals("g", list3.get(7));
-    Assert.assertEquals("tt", list3.get(8));
-    Assert.assertEquals("ab", list3.get(9));
-    Assert.assertEquals("99", list3.get(10));
-    Assert.assertEquals("444", list3.get(11));
-
-    Assert.assertEquals(12, list2.size());
+    Set<String> referenceSet = Sets.newHashSet("a", "b", "c", "d", "e", "f", "g");
+    Assert.assertTrue(referenceSet.containsAll(set1));
+    Assert.assertTrue(set1.containsAll(referenceSet));
 
     map.endWindow();
     store.endWindow();
@@ -231,11 +164,30 @@ public class SpillableByteArrayListMultimapImplTest
     store.beginWindow(nextWindowId);
     map.beginWindow(nextWindowId);
 
-    SpillableTestUtils.checkValue(store, 0L,
-        SliceUtils.concatenate(keyBytes, SpillableByteArrayListMultimapImpl.SIZE_KEY_SUFFIX), 12, 0, serdeInt);
+    Set<String> set2 = map.get(key);
 
-    SpillableTestUtils.checkValue(store, 0L, keyBytes, 0, Lists.<String>newArrayList("a", "111", "b", "222", "d", "333",
-        "f", "g", "tt", "ab", "99", "444"));
+    Assert.assertEquals(7, set2.size());
+    Assert.assertTrue(referenceSet.containsAll(set2));
+    Assert.assertTrue(set2.containsAll(referenceSet));
+
+    set2.add("tt");
+    set2.add("ab");
+    set2.add("99");
+    set2.add("oo");
+    referenceSet = Sets.newHashSet("a", "b", "c", "d", "e", "f", "g", "tt", "ab", "99", "oo");
+    Assert.assertTrue(referenceSet.containsAll(set2));
+    Assert.assertTrue(set2.containsAll(referenceSet));
+
+    Assert.assertEquals(11, set2.size());
+
+    map.endWindow();
+    store.endWindow();
+
+    nextWindowId++;
+    store.beginWindow(nextWindowId);
+    map.beginWindow(nextWindowId);
+
+    Assert.assertEquals(11, set2.size());
 
     map.endWindow();
     store.endWindow();
@@ -248,8 +200,8 @@ public class SpillableByteArrayListMultimapImplTest
   {
     SpillableStateStore store = testMeta.store;
 
-    SpillableByteArrayListMultimapImpl<String, String> map =
-        new SpillableByteArrayListMultimapImpl<>(store, ID1, 0L, new SerdeStringSlice(), new SerdeStringSlice());
+    SpillableSetMultimapImpl<String, String> map =
+        new SpillableSetMultimapImpl<>(store, ID1, 0L, new SerdeStringSlice(), new SerdeStringSlice());
 
     store.setup(testMeta.operatorContext);
     map.setup(testMeta.operatorContext);
@@ -258,7 +210,7 @@ public class SpillableByteArrayListMultimapImplTest
     nextWindowId = simpleMultiKeyTestHelper(store, map, "a", nextWindowId);
     long activationWindow = nextWindowId;
     store.beforeCheckpoint(nextWindowId);
-    SpillableByteArrayListMultimapImpl<String, String> clonedMap = KryoCloneUtils.cloneObject(map);
+    SpillableSetMultimapImpl<String, String> clonedMap = KryoCloneUtils.cloneObject(map);
     store.checkpointed(nextWindowId);
     store.committed(nextWindowId);
 
@@ -267,40 +219,19 @@ public class SpillableByteArrayListMultimapImplTest
     store.beginWindow(nextWindowId);
     map.beginWindow(nextWindowId);
 
-    List<String> list1 = map.get("a");
+    Set<String> set1 = map.get("a");
 
-    Assert.assertEquals(12, list1.size());
+    Assert.assertEquals(11, set1.size());
 
-    Assert.assertEquals("a", list1.get(0));
-    Assert.assertEquals("111", list1.get(1));
-    Assert.assertEquals("b", list1.get(2));
-    Assert.assertEquals("222", list1.get(3));
-    Assert.assertEquals("d", list1.get(4));
-    Assert.assertEquals("333", list1.get(5));
-    Assert.assertEquals("f", list1.get(6));
-    Assert.assertEquals("g", list1.get(7));
-    Assert.assertEquals("tt", list1.get(8));
-    Assert.assertEquals("ab", list1.get(9));
-    Assert.assertEquals("99", list1.get(10));
-    Assert.assertEquals("444", list1.get(11));
+    Set<String> referenceSet = Sets.newHashSet("a", "b", "c", "d", "e", "f", "g", "tt", "ab", "99", "oo");
+    Assert.assertTrue(referenceSet.containsAll(set1));
+    Assert.assertTrue(set1.containsAll(referenceSet));
 
-    list1.add("111");
+    set1.add("111");
 
-    Assert.assertEquals("a", list1.get(0));
-    Assert.assertEquals("111", list1.get(1));
-    Assert.assertEquals("b", list1.get(2));
-    Assert.assertEquals("222", list1.get(3));
-    Assert.assertEquals("d", list1.get(4));
-    Assert.assertEquals("333", list1.get(5));
-    Assert.assertEquals("f", list1.get(6));
-    Assert.assertEquals("g", list1.get(7));
-    Assert.assertEquals("tt", list1.get(8));
-    Assert.assertEquals("ab", list1.get(9));
-    Assert.assertEquals("99", list1.get(10));
-    Assert.assertEquals("444", list1.get(11));
-    Assert.assertEquals("111", list1.get(12));
+    Assert.assertTrue(set1.contains("111"));
 
-    Assert.assertEquals(13, list1.size());
+    Assert.assertEquals(12, set1.size());
 
     map.endWindow();
     store.endWindow();
@@ -319,19 +250,15 @@ public class SpillableByteArrayListMultimapImplTest
 
     store.setup(context);
     map.setup(context);
+
     nextWindowId = activationWindow + 1;
+
     store.beginWindow(nextWindowId);
     map.beginWindow(nextWindowId);
 
-    SerdeStringSlice serdeString = new SerdeStringSlice();
-    Slice keySlice = serdeString.serialize("a");
-    byte[] keyBytes = SliceUtils.concatenate(ID1, keySlice.toByteArray());
-
-    SpillableTestUtils.checkValue(store, 0L, keyBytes, 0, Lists.<String>newArrayList("a", "111", "b", "222", "d",
-        "333", "f", "g", "tt", "ab", "99", "444"));
-
     Assert.assertEquals(1, map.size());
-    Assert.assertEquals(12, map.get("a").size());
+    Assert.assertTrue(map.containsKey("a"));
+    Assert.assertEquals(11, map.get("a").size());
 
     map.endWindow();
     store.endWindow();

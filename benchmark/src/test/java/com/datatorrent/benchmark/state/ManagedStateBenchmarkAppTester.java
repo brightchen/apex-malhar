@@ -29,7 +29,7 @@ import org.apache.hadoop.fs.FileUtil;
 import com.datatorrent.api.DAG;
 import com.datatorrent.api.LocalMode;
 import com.datatorrent.api.StreamingApplication;
-import com.datatorrent.benchmark.state.StoreOperator.ExeMode;
+import com.datatorrent.benchmark.state.StoreOperator.ExecMode;
 
 /**
  * This is not a really unit test, but in fact a benchmark runner.
@@ -49,22 +49,22 @@ public class ManagedStateBenchmarkAppTester extends ManagedStateBenchmarkApp
   @Test
   public void testUpdateSync() throws Exception
   {
-    test(ExeMode.UpdateSync);
+    test(ExecMode.UPDATESYNC);
   }
   
   @Test
   public void testUpdateAsync() throws Exception
   {
-    test(ExeMode.UpdateAsync);
+    test(ExecMode.UPDATEASYNC);
   }
   
   @Test
   public void testInsert() throws Exception
   {
-    test(ExeMode.Insert);
+    test(ExecMode.INSERT);
   }
   
-  public void test(ExeMode exeMode) throws Exception
+  public void test(ExecMode exeMode) throws Exception
   {
     Configuration conf = new Configuration(false);
 
@@ -72,7 +72,7 @@ public class ManagedStateBenchmarkAppTester extends ManagedStateBenchmarkApp
     DAG dag = lma.getDAG();
 
     super.populateDAG(dag, conf);
-    store.exeMode = exeMode;
+    storeOperator.execMode = exeMode;
     
     StreamingApplication app = new StreamingApplication()
     {
