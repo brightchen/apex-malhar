@@ -192,7 +192,6 @@ public abstract class AbstractFileSplitter extends BaseOperator
   {
     LOG.debug("file {}", fileInfo.getFilePath());
     FileMetadata fileMetadata = createFileMetadata(fileInfo);
-    LOG.debug("fileMetadata {}", fileMetadata);
     Path path = new Path(fileInfo.getFilePath());
 
     fileMetadata.setFileName(path.getName());
@@ -389,7 +388,7 @@ public abstract class AbstractFileSplitter extends BaseOperator
       this.filePath = filePath;
       discoverTime = System.currentTimeMillis();
     }
-    
+
     protected FileMetadata(FileMetadata fileMetadata)
     {
       this();

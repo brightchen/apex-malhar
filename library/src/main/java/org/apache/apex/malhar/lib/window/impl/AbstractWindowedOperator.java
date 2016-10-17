@@ -79,16 +79,16 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
 
   private Function<InputT, Long> timestampExtractor;
 
-  private long currentWatermark = -1;
-  private long watermarkTimestamp = -1;
+  protected long nextWatermark = -1;
+  protected long currentWatermark = -1;
   private boolean triggerAtWatermark;
-  private long earlyTriggerCount;
+  protected long earlyTriggerCount;
   private long earlyTriggerMillis;
-  private long lateTriggerCount;
+  protected long lateTriggerCount;
   private long lateTriggerMillis;
   private long currentDerivedTimestamp = -1;
   private long timeIncrement;
-  private long fixedWatermarkMillis = -1;
+  protected long fixedWatermarkMillis = -1;
 
   private Map<String, Component<Context.OperatorContext>> components = new HashMap<>();
 
@@ -96,7 +96,9 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
   protected RetractionStorageT retractionStorage;
   protected AccumulationT accumulation;
 
-  private static final transient Collection<? extends Window> GLOBAL_WINDOW_SINGLETON_SET = Collections.singleton(Window.GlobalWindow.INSTANCE);
+
+  protected static final transient Collection<? extends Window> GLOBAL_WINDOW_SINGLETON_SET = Collections.singleton(Window.GlobalWindow.INSTANCE);
+
   private static final transient Logger LOG = LoggerFactory.getLogger(AbstractWindowedOperator.class);
 
   public final transient DefaultInputPort<Tuple<InputT>> input = new DefaultInputPort<Tuple<InputT>>()
@@ -131,32 +133,36 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
   /**
    * Process the incoming data tuple
    *
-   * @param tuple
+   * @param tuple the incoming tuple
    */
   public void processTuple(Tuple<InputT> tuple)
   {
-    long timestamp = extractTimestamp(tuple);
+    long timestamp = extractTimestamp(tuple, timestampExtractor);
     if (isTooLate(timestamp)) {
       dropTuple(tuple);
     } else {
-      Tuple.WindowedTuple<InputT> windowedTuple = getWindowedValue(tuple);
+      Tuple.WindowedTuple<InputT> windowedTuple = getWindowedValueWithTimestamp(tuple, timestamp);
       // do the accumulation
       accumulateTuple(windowedTuple);
+      processWindowState(windowedTuple);
+    }
+  }
 
-      for (Window window : windowedTuple.getWindows()) {
-        WindowState windowState = windowStateMap.get(window);
-        windowState.tupleCount++;
-        // process any count based triggers
-        if (windowState.watermarkArrivalTime == -1) {
-          // watermark has not arrived yet, check for early count based trigger
-          if (earlyTriggerCount > 0 && (windowState.tupleCount % earlyTriggerCount) == 0) {
-            fireTrigger(window, windowState);
-          }
-        } else {
-          // watermark has arrived, check for late count based trigger
-          if (lateTriggerCount > 0 && (windowState.tupleCount % lateTriggerCount) == 0) {
-            fireTrigger(window, windowState);
-          }
+  protected void processWindowState(Tuple.WindowedTuple<? extends Object> windowedTuple)
+  {
+    for (Window window : windowedTuple.getWindows()) {
+      WindowState windowState = windowStateMap.get(window);
+      windowState.tupleCount++;
+      // process any count based triggers
+      if (windowState.watermarkArrivalTime == -1) {
+        // watermark has not arrived yet, check for early count based trigger
+        if (earlyTriggerCount > 0 && (windowState.tupleCount % earlyTriggerCount) == 0) {
+          fireTrigger(window, windowState);
+        }
+      } else {
+        // watermark has arrived, check for late count based trigger
+        if (lateTriggerCount > 0 && (windowState.tupleCount % lateTriggerCount) == 0) {
+          fireTrigger(window, windowState);
         }
       }
     }
@@ -206,21 +212,21 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
   /**
    * This method sets the storage for the data for each window
    *
-   * @param storageAgent
+   * @param dataStorage The data storage
    */
-  public void setDataStorage(DataStorageT storageAgent)
+  public void setDataStorage(DataStorageT dataStorage)
   {
-    this.dataStorage = storageAgent;
+    this.dataStorage = dataStorage;
   }
 
   /**
    * This method sets the storage for the retraction data for each window. Only used when the accumulation mode is ACCUMULATING_AND_RETRACTING
    *
-   * @param storageAgent
+   * @param retractionStorage The retraction storage
    */
-  public void setRetractionStorage(RetractionStorageT storageAgent)
+  public void setRetractionStorage(RetractionStorageT retractionStorage)
   {
-    this.retractionStorage = storageAgent;
+    this.retractionStorage = retractionStorage;
   }
 
   public void addComponent(String key, Component<Context.OperatorContext> component)
@@ -232,7 +238,7 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
    * Sets the accumulation, which basically tells the WindowedOperator what to do if a new tuple comes in and what
    * to put in the pane when a trigger is fired
    *
-   * @param accumulation
+   * @param accumulation the accumulation
    */
   public void setAccumulation(AccumulationT accumulation)
   {
@@ -248,6 +254,11 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
   public void setTimestampExtractor(Function<InputT, Long> timestampExtractor)
   {
     this.timestampExtractor = timestampExtractor;
+  }
+
+  public void setNextWatermark(long timestamp)
+  {
+    this.nextWatermark = timestamp;
   }
 
   /**
@@ -292,15 +303,31 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
   @Override
   public Tuple.WindowedTuple<InputT> getWindowedValue(Tuple<InputT> input)
   {
+    long timestamp = extractTimestamp(input, timestampExtractor);
+    return getWindowedValueWithTimestamp(input, timestamp);
+  }
+
+  public <T> Tuple.WindowedTuple<T> getWindowedValueWithTimestamp(Tuple<T> input, long timestamp)
+  {
     if (windowOption == null && input instanceof Tuple.WindowedTuple) {
       // inherit the windows from upstream
-      return (Tuple.WindowedTuple<InputT>)input;
+      initializeWindowStates(((Tuple.WindowedTuple<T>)input).getWindows());
+      return (Tuple.WindowedTuple<T>)input;
     } else {
-      return new Tuple.WindowedTuple<>(assignWindows(input), extractTimestamp(input), input.getValue());
+      return new Tuple.WindowedTuple<>(assignWindows(input, timestamp), timestamp, input.getValue());
     }
   }
 
-  private long extractTimestamp(Tuple<InputT> tuple)
+  protected void initializeWindowStates(Collection<? extends Window> windows)
+  {
+    for (Window window : windows) {
+      if (!windowStateMap.containsWindow(window)) {
+        windowStateMap.put(window, new WindowState());
+      }
+    }
+  }
+
+  protected <T> long extractTimestamp(Tuple<T> tuple, Function<T, Long> timestampExtractor)
   {
     if (timestampExtractor == null) {
       if (tuple instanceof Tuple.TimestampedTuple) {
@@ -313,19 +340,14 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
     }
   }
 
-  private Collection<? extends Window> assignWindows(Tuple<InputT> inputTuple)
+  protected <T> Collection<? extends Window> assignWindows(Tuple<T> inputTuple, long timestamp)
   {
     if (windowOption instanceof WindowOption.GlobalWindow) {
       return GLOBAL_WINDOW_SINGLETON_SET;
     } else {
-      long timestamp = extractTimestamp(inputTuple);
       if (windowOption instanceof WindowOption.TimeWindows) {
         Collection<? extends Window> windows = getTimeWindowsForTimestamp(timestamp);
-        for (Window window : windows) {
-          if (!windowStateMap.containsWindow(window)) {
-            windowStateMap.put(window, new WindowState());
-          }
-        }
+        initializeWindowStates(windows);
         return windows;
       } else if (windowOption instanceof WindowOption.SessionWindows) {
         return assignSessionWindows(timestamp, inputTuple);
@@ -335,7 +357,7 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
     }
   }
 
-  protected Collection<Window.SessionWindow> assignSessionWindows(long timestamp, Tuple<InputT> inputTuple)
+  protected <T> Collection<Window.SessionWindow> assignSessionWindows(long timestamp, Tuple<T> inputTuple)
   {
     throw new UnsupportedOperationException("Session window require keyed tuples");
   }
@@ -345,10 +367,10 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
    * If we are doing sliding windows, this will return multiple windows. Otherwise, only one window will be returned.
    * Note that this method does not apply to SessionWindows.
    *
-   * @param timestamp
-   * @return
+   * @param timestamp the timestamp
+   * @return the windows this timestamp belongs to
    */
-  private Collection<Window.TimeWindow> getTimeWindowsForTimestamp(long timestamp)
+  protected Collection<Window.TimeWindow> getTimeWindowsForTimestamp(long timestamp)
   {
     List<Window.TimeWindow> windows = new ArrayList<>();
     if (windowOption instanceof WindowOption.TimeWindows) {
@@ -378,11 +400,11 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
   @Override
   public boolean isTooLate(long timestamp)
   {
-    return allowedLatenessMillis < 0 ? false : (timestamp < currentWatermark - allowedLatenessMillis);
+    return allowedLatenessMillis >= 0 && (timestamp < currentWatermark - allowedLatenessMillis);
   }
 
   @Override
-  public void dropTuple(Tuple<InputT> input)
+  public void dropTuple(Tuple input)
   {
     // do nothing
     LOG.debug("Dropping late tuple {}", input);
@@ -391,10 +413,11 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
   @Override
   public void processWatermark(ControlTuple.Watermark watermark)
   {
-    this.watermarkTimestamp = watermark.getTimestamp();
+    this.nextWatermark = watermark.getTimestamp();
   }
 
   @Override
+  @SuppressWarnings("unchecked")
   public void setup(Context.OperatorContext context)
   {
     this.timeIncrement = context.getValue(Context.OperatorContext.APPLICATION_WINDOW_COUNT) * context.getValue(Context.DAGContext.STREAMING_WINDOW_SIZE_MILLIS);
@@ -442,7 +465,6 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
     } else {
       currentDerivedTimestamp += timeIncrement;
     }
-    watermarkTimestamp = -1;
   }
 
   /**
@@ -463,21 +485,20 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
     }
   }
 
-  private void processWatermarkAtEndWindow()
+  protected void processWatermarkAtEndWindow()
   {
     if (fixedWatermarkMillis > 0) {
-      watermarkTimestamp = currentDerivedTimestamp - fixedWatermarkMillis;
+      nextWatermark = currentDerivedTimestamp - fixedWatermarkMillis;
     }
-    if (watermarkTimestamp > 0) {
-      this.currentWatermark = watermarkTimestamp;
+    if (nextWatermark > 0 && currentWatermark < nextWatermark) {
 
-      long horizon = watermarkTimestamp - allowedLatenessMillis;
+      long horizon = nextWatermark - allowedLatenessMillis;
 
       for (Iterator<Map.Entry<Window, WindowState>> it = windowStateMap.entries().iterator(); it.hasNext(); ) {
         Map.Entry<Window, WindowState> entry = it.next();
         Window window = entry.getKey();
         WindowState windowState = entry.getValue();
-        if (window.getBeginTimestamp() + window.getDurationMillis() < watermarkTimestamp) {
+        if (window.getBeginTimestamp() + window.getDurationMillis() < nextWatermark) {
           // watermark has not arrived for this window before, marking this window late
           if (windowState.watermarkArrivalTime == -1) {
             windowState.watermarkArrivalTime = currentDerivedTimestamp;
@@ -496,7 +517,8 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
           }
         }
       }
-      controlOutput.emit(new WatermarkImpl(watermarkTimestamp));
+      controlOutput.emit(new WatermarkImpl(nextWatermark));
+      this.currentWatermark = nextWatermark;
     }
   }
 
@@ -525,7 +547,7 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
   public void fireTrigger(Window window, WindowState windowState)
   {
     if (triggerOption.getAccumulationMode() == TriggerOption.AccumulationMode.ACCUMULATING_AND_RETRACTING) {
-      fireRetractionTrigger(window);
+      fireRetractionTrigger(window, triggerOption.isFiringOnlyUpdatedPanes());
     }
     fireNormalTrigger(window, triggerOption.isFiringOnlyUpdatedPanes());
     windowState.lastTriggerFiredTime = currentDerivedTimestamp;
@@ -534,10 +556,20 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
     }
   }
 
+  DataStorageT getDataStorage()
+  {
+    return dataStorage;
+  }
+
+  AccumulationT getAccumulation()
+  {
+    return accumulation;
+  }
+
   /**
    * This method fires the normal trigger for the given window.
    *
-   * @param window
+   * @param window the window to fire trigger on
    * @param fireOnlyUpdatedPanes Do not fire trigger if the old value is the same as the new value. If true, retraction storage is required.
    */
   public abstract void fireNormalTrigger(Window window, boolean fireOnlyUpdatedPanes);
@@ -546,9 +578,10 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
    * This method fires the retraction trigger for the given window. This should only be valid if the accumulation
    * mode is ACCUMULATING_AND_RETRACTING
    *
-   * @param window
+   * @param window the window to fire the retraction trigger on
+   * @param fireOnlyUpdatedPanes Do not fire trigger if the retraction value is the same as the new value.
    */
-  public abstract void fireRetractionTrigger(Window window);
+  public abstract void fireRetractionTrigger(Window window, boolean fireOnlyUpdatedPanes);
 
 
   @Override
