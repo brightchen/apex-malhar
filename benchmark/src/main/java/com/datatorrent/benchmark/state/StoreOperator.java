@@ -34,6 +34,7 @@ import com.google.common.collect.Maps;
 import com.datatorrent.api.Context.OperatorContext;
 import com.datatorrent.api.DefaultInputPort;
 import com.datatorrent.api.Operator;
+import com.datatorrent.benchmark.monitor.ResourceMonitorService;
 import com.datatorrent.common.util.BaseOperator;
 import com.datatorrent.lib.util.KeyValPair;
 import com.datatorrent.netlet.util.Slice;
@@ -46,14 +47,15 @@ public class StoreOperator extends BaseOperator implements Operator.CheckpointNo
   {
     INSERT,
     UPDATESYNC,
-    UPDATEASYNC
+    UPDATEASYNC,
+    GETSYNC,
+    DONOTHING
   }
 
-  protected static final int numOfWindowPerStatistics = 10;
+  protected static final int numOfWindowPerStatistics = 120;
 
   //this is the store we are going to use
   protected ManagedTimeUnifiedStateImpl store;
-  protected long bucketId = 1;
 
   protected long lastCheckPointWindowId = -1;
   protected long currentWindowId;
@@ -64,6 +66,7 @@ public class StoreOperator extends BaseOperator implements Operator.CheckpointNo
   protected ExecMode execMode = ExecMode.INSERT;
   protected int timeRange = 1000 * 60;
 
+  protected transient ResourceMonitorService monitorService;
   public final transient DefaultInputPort<KeyValPair<byte[], byte[]>> input = new DefaultInputPort<KeyValPair<byte[], byte[]>>()
   {
     @Override
@@ -78,6 +81,13 @@ public class StoreOperator extends BaseOperator implements Operator.CheckpointNo
   {
     logger.info("The execute mode is: {}", execMode.name());
     store.setup(context);
+    monitorService = ResourceMonitorService.create(60000).start();
+  }
+
+  @Override
+  public void teardown()
+  {
+    monitorService.shutdownNow();
   }
 
   @Override
@@ -107,6 +117,7 @@ public class StoreOperator extends BaseOperator implements Operator.CheckpointNo
    * we verify 3 type of operation
    * @param tuple
    */
+  protected Slice keySliceForRead = new Slice(null, 0, 0);
   protected void processTuple(KeyValPair<byte[], byte[]> tuple)
   {
     switch (execMode) {
@@ -115,20 +126,43 @@ public class StoreOperator extends BaseOperator implements Operator.CheckpointNo
         updateAsync(tuple);
         break;
 
+
       case UPDATESYNC:
-        store.getSync(getTimeByKey(tuple.getKey()), new Slice(tuple.getKey()));
+//        keySliceForRead.buffer = tuple.getKey();
+//        keySliceForRead.offset = 0;
+//        keySliceForRead.length = tuple.getKey().length;
+//        store.getSync(getTimeByKey(tuple.getKey()), keySliceForRead);
         insertValueToStore(tuple);
+        break;
+
+      case GETSYNC:
+        store.getSync(getTimeByKey(tuple.getKey()), new Slice(tuple.getKey()));
+        break;
+
+      case DONOTHING:
         break;
 
       default: //insert
         insertValueToStore(tuple);
     }
+
+    ++tupleCount;
   }
 
+  protected transient long sameKeyCount = 0;
+  protected transient long preKey = -1;
   protected long getTimeByKey(byte[] key)
   {
     long lKey = ByteBuffer.wrap(key).getLong();
-    return lKey - (lKey % timeRange);
+    lKey = lKey - (lKey % timeRange);
+    if (preKey == lKey) {
+      sameKeyCount++;
+    } else {
+      logger.info("key: {} count: {}", preKey, sameKeyCount);
+      preKey = lKey;
+      sameKeyCount = 1;
+    }
+    return lKey;
   }
 
   // give a barrier to avoid used up memory
@@ -177,8 +211,7 @@ public class StoreOperator extends BaseOperator implements Operator.CheckpointNo
     Slice key = new Slice(tuple.getKey());
     Slice value = new Slice(tuple.getValue());
 
-    store.put(bucketId, key, value);
-    ++tupleCount;
+    store.put(System.currentTimeMillis(), key, value);
   }
 
   @Override
@@ -212,7 +245,7 @@ public class StoreOperator extends BaseOperator implements Operator.CheckpointNo
   protected void logStatistics()
   {
     long spentTime = System.currentTimeMillis() - statisticsBeginTime;
-    logger.info("Time Spent: {}, Processed tuples: {}, rate per second: {}", spentTime, tupleCount, tupleCount * 1000 / spentTime);
+    logger.info("Windows: {}; Time Spent: {}, Processed tuples: {}, rate per second: {}", windowCountPerStatistics, spentTime, tupleCount, tupleCount * 1000 / spentTime);
 
     statisticsBeginTime = System.currentTimeMillis();
     tupleCount = 0;

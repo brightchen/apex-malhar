@@ -124,8 +124,8 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
 
   class BucketedValue
   {
-    private long timeBucket;
-    private Slice value;
+    public long timeBucket;
+    public Slice value;
 
     protected BucketedValue()
     {
@@ -376,13 +376,14 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
       }
     }
 
+    protected transient Slice valSlice = new Slice(null, 0, 0);
     private BucketedValue readValue(FileAccess.FileReader fileReader, Slice key, long timeBucket)
     {
-      Slice valSlice = new Slice(null, 0, 0);
       try {
         if (fileReader.seek(key)) {
           fileReader.next(dummyGetKey, valSlice);
-          return new BucketedValue(timeBucket, valSlice);
+          return BucketValueManager.INSTANCE.allocateBucketValueForRead(timeBucket, valSlice);
+          //return new BucketedValue(timeBucket, valSlice);
         } else {
           return null;
         }
@@ -416,7 +417,8 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
 
       BucketedValue bucketedValue = flash.get(key);
       if (bucketedValue == null) {
-        bucketedValue = new BucketedValue(timeBucket, value);
+        //bucketedValue = new BucketedValue(timeBucket, value);
+        bucketedValue = BucketValueManager.INSTANCE.allocateBucketValueForWrite(timeBucket, value);
         flash.put(key, bucketedValue);
         sizeInBytes.getAndAdd(key.length + value.length + Longs.BYTES);
       } else {
