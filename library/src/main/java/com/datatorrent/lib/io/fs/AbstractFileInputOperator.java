@@ -96,8 +96,9 @@ import com.datatorrent.lib.util.KryoCloneUtils;
  * @param <T> The type of the object that this input operator reads.
  * @since 1.0.2
  */
-public abstract class AbstractFileInputOperator<T>
-    implements InputOperator, Partitioner<AbstractFileInputOperator<T>>, StatsListener, Operator.CheckpointListener
+@org.apache.hadoop.classification.InterfaceStability.Evolving
+public abstract class AbstractFileInputOperator<T> implements InputOperator, Partitioner<AbstractFileInputOperator<T>>, StatsListener,
+    Operator.CheckpointListener, Operator.CheckpointNotificationListener
 {
   private static final Logger LOG = LoggerFactory.getLogger(AbstractFileInputOperator.class);
 
@@ -106,7 +107,7 @@ public abstract class AbstractFileInputOperator<T>
   @NotNull
   protected DirectoryScanner scanner = new DirectoryScanner();
   protected int scanIntervalMillis = 5000;
-  protected int offset;
+  protected long offset;
   protected String currentFile;
   protected Set<String> processedFiles = new HashSet<String>();
   protected int emitBatchSize = 1000;
@@ -114,7 +115,7 @@ public abstract class AbstractFileInputOperator<T>
   protected int partitionCount = 1;
   private int retryCount = 0;
   private int maxRetryCount = 5;
-  protected transient int skipCount = 0;
+  protected transient long skipCount = 0;
   private transient OperatorContext context;
 
   private final BasicCounters<MutableLong> fileCounters = new BasicCounters<MutableLong>(MutableLong.class);
@@ -143,7 +144,7 @@ public abstract class AbstractFileInputOperator<T>
   protected static class FailedFile
   {
     String path;
-    int   offset;
+    long   offset;
     int    retryCount;
     long   lastFailedTime;
 
@@ -151,14 +152,14 @@ public abstract class AbstractFileInputOperator<T>
     @SuppressWarnings("unused")
     protected FailedFile() {}
 
-    protected FailedFile(String path, int offset)
+    protected FailedFile(String path, long offset)
     {
       this.path = path;
       this.offset = offset;
       this.retryCount = 0;
     }
 
-    protected FailedFile(String path, int offset, int retryCount)
+    protected FailedFile(String path, long offset, int retryCount)
     {
       this.path = path;
       this.offset = offset;
@@ -591,16 +592,26 @@ public abstract class AbstractFileInputOperator<T>
                 pendingFiles.remove(recoveryEntry.file);
               }
               inputStream = retryFailedFile(new FailedFile(recoveryEntry.file, recoveryEntry.startOffset));
+
+              while (--skipCount >= 0) {
+                readEntity();
+              }
               while (offset < recoveryEntry.endOffset) {
                 T line = readEntity();
                 offset++;
                 emit(line);
+              }
+              if (recoveryEntry.fileClosed) {
+                closeFile(inputStream);
               }
             } else {
               while (offset < recoveryEntry.endOffset) {
                 T line = readEntity();
                 offset++;
                 emit(line);
+              }
+              if (recoveryEntry.fileClosed) {
+                closeFile(inputStream);
               }
             }
           }
@@ -623,7 +634,7 @@ public abstract class AbstractFileInputOperator<T>
       try {
         if (currentFile != null && offset > 0) {
           //open file resets offset to 0 so this a way around it.
-          int tmpOffset = offset;
+          long tmpOffset = offset;
           if (fs.exists(new Path(currentFile))) {
             this.inputStream = openFile(new Path(currentFile));
             offset = tmpOffset;
@@ -651,8 +662,9 @@ public abstract class AbstractFileInputOperator<T>
       }
     }
     if (inputStream != null) {
-      int startOffset = offset;
+      long startOffset = offset;
       String file  = currentFile; //current file is reset to null when closed.
+      boolean fileClosed = false;
 
       try {
         int counterForTuple = 0;
@@ -661,6 +673,7 @@ public abstract class AbstractFileInputOperator<T>
           if (line == null) {
             LOG.info("done reading file ({} entries).", offset);
             closeFile(inputStream);
+            fileClosed = true;
             break;
           }
 
@@ -678,9 +691,9 @@ public abstract class AbstractFileInputOperator<T>
       } catch (IOException e) {
         failureHandling(e);
       }
-      //Only when something was emitted from the file then we record it for entry.
-      if (offset > startOffset) {
-        currentWindowRecoveryState.add(new RecoveryEntry(file, startOffset, offset));
+      //Only when something was emitted from the file, or we have a closeFile(), then we record it for entry.
+      if (offset >= startOffset) {
+        currentWindowRecoveryState.add(new RecoveryEntry(file, startOffset, offset, fileClosed));
       }
     }
   }
@@ -908,6 +921,11 @@ public abstract class AbstractFileInputOperator<T>
   }
 
   @Override
+  public void beforeCheckpoint(long windowId)
+  {
+  }
+
+  @Override
   public void checkpointed(long windowId)
   {
   }
@@ -1130,8 +1148,9 @@ public abstract class AbstractFileInputOperator<T>
   protected static class RecoveryEntry
   {
     final String file;
-    final int startOffset;
-    final int endOffset;
+    final long startOffset;
+    final long endOffset;
+    final boolean fileClosed;
 
     @SuppressWarnings("unused")
     private RecoveryEntry()
@@ -1139,13 +1158,15 @@ public abstract class AbstractFileInputOperator<T>
       file = null;
       startOffset = -1;
       endOffset = -1;
+      fileClosed = false;
     }
 
-    RecoveryEntry(String file, int startOffset, int endOffset)
+    RecoveryEntry(String file, long startOffset, long endOffset, boolean fileClosed)
     {
       this.file = Preconditions.checkNotNull(file, "file");
       this.startOffset = startOffset;
       this.endOffset = endOffset;
+      this.fileClosed = fileClosed;
     }
 
     @Override
@@ -1166,6 +1187,9 @@ public abstract class AbstractFileInputOperator<T>
       if (startOffset != that.startOffset) {
         return false;
       }
+      if (fileClosed != that.fileClosed) {
+        return false;
+      }
       return file.equals(that.file);
 
     }
@@ -1174,8 +1198,8 @@ public abstract class AbstractFileInputOperator<T>
     public int hashCode()
     {
       int result = file.hashCode();
-      result = 31 * result + startOffset;
-      result = 31 * result + endOffset;
+      result = 31 * result + (int)(startOffset & 0xFFFFFFFF);
+      result = 31 * result + (int)(endOffset & 0xFFFFFFFF);
       return result;
     }
   }

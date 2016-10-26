@@ -66,6 +66,7 @@ import com.datatorrent.api.Context;
 import com.datatorrent.api.DAG;
 import com.datatorrent.api.LocalMode;
 import com.datatorrent.api.StreamingApplication;
+import com.datatorrent.api.annotation.Stateless;
 import com.datatorrent.lib.helper.OperatorContextTestHelper;
 import com.datatorrent.lib.testbench.RandomWordGenerator;
 import com.datatorrent.lib.util.TestUtils;
@@ -243,8 +244,11 @@ public class AbstractFileOutputOperatorTest
    * @param writer The writer to checkpoint.
    * @return new writer.
    */
-  public static AbstractFileOutputOperator checkpoint(AbstractFileOutputOperator writer)
+  public static AbstractFileOutputOperator checkpoint(AbstractFileOutputOperator writer, long windowId)
   {
+    if (windowId >= Stateless.WINDOW_ID) {
+      writer.beforeCheckpoint(windowId);
+    }
     Kryo kryo = new Kryo();
     ByteArrayOutputStream bos = new ByteArrayOutputStream();
     Output loutput = new Output(bos);
@@ -418,7 +422,7 @@ public class AbstractFileOutputOperatorTest
     writer.input.put(1);
     writer.endWindow();
 
-    AbstractFileOutputOperator checkPointWriter = checkpoint(writer);
+    AbstractFileOutputOperator checkPointWriter = checkpoint(writer, Stateless.WINDOW_ID);
 
     writer.beginWindow(1);
     writer.input.put(2);
@@ -577,6 +581,7 @@ public class AbstractFileOutputOperatorTest
 
     writer.requestFinalize(EVEN_FILE);
     writer.requestFinalize(ODD_FILE);
+    writer.beforeCheckpoint(1);
     writer.committed(1);
   }
 
@@ -603,6 +608,7 @@ public class AbstractFileOutputOperatorTest
 
     writer.requestFinalize(ODD_FILE);
     writer.requestFinalize(EVEN_FILE);
+    writer.beforeCheckpoint(1);
     writer.committed(1);
   }
 
@@ -672,7 +678,7 @@ public class AbstractFileOutputOperatorTest
     writer.requestFinalize(EVEN_FILE);
     writer.endWindow();
 
-    AbstractFileOutputOperator checkPointWriter = checkpoint(writer);
+    AbstractFileOutputOperator checkPointWriter = checkpoint(writer, Stateless.WINDOW_ID);
 
     writer.beginWindow(1);
     writer.input.put(4);
@@ -690,6 +696,7 @@ public class AbstractFileOutputOperatorTest
     writer.input.put(8);
     writer.input.put(9);
     writer.endWindow();
+    writer.beforeCheckpoint(2);
     writer.committed(2);
   }
 
@@ -815,7 +822,7 @@ public class AbstractFileOutputOperatorTest
     writer.input.put(2);
     writer.endWindow();
 
-    AbstractFileOutputOperator checkPointWriter = checkpoint(writer);
+    AbstractFileOutputOperator checkPointWriter = checkpoint(writer, Stateless.WINDOW_ID);
 
     writer.beginWindow(1);
     writer.input.put(3);
@@ -862,8 +869,8 @@ public class AbstractFileOutputOperatorTest
     writer.input.put(4);
     writer.endWindow();
 
-    AbstractFileOutputOperator checkPointWriter = checkpoint(writer);
-    AbstractFileOutputOperator checkPointWriter1 = checkpoint(writer);
+    AbstractFileOutputOperator checkPointWriter = checkpoint(writer, Stateless.WINDOW_ID);
+    AbstractFileOutputOperator checkPointWriter1 = checkpoint(writer, Stateless.WINDOW_ID);
 
     LOG.debug("Checkpoint endOffsets={}", checkPointWriter.endOffsets);
 
@@ -1128,7 +1135,7 @@ public class AbstractFileOutputOperatorTest
     writer.input.put(1);
     writer.endWindow();
 
-    AbstractFileOutputOperator checkPointWriter = checkpoint(writer);
+    AbstractFileOutputOperator checkPointWriter = checkpoint(writer, Stateless.WINDOW_ID);
 
     writer.beginWindow(1);
     writer.input.put(2);
@@ -1225,7 +1232,7 @@ public class AbstractFileOutputOperatorTest
     writer.input.put(1);
     writer.endWindow();
 
-    AbstractFileOutputOperator checkPointWriter = checkpoint(writer);
+    AbstractFileOutputOperator checkPointWriter = checkpoint(writer, Stateless.WINDOW_ID);
 
     writer.beginWindow(1);
     writer.input.put(2);
@@ -1272,7 +1279,7 @@ public class AbstractFileOutputOperatorTest
     writer.input.process(1);
     writer.endWindow();
 
-    AbstractFileOutputOperator checkPointWriter = checkpoint(writer);
+    AbstractFileOutputOperator checkPointWriter = checkpoint(writer, Stateless.WINDOW_ID);
 
     writer.beginWindow(1);
     writer.input.process(2);
@@ -1363,7 +1370,7 @@ public class AbstractFileOutputOperatorTest
     writer.input.put(3);
     writer.input.put(4);
 
-    AbstractFileOutputOperator checkPointWriter = checkpoint(writer);
+    AbstractFileOutputOperator checkPointWriter = checkpoint(writer, Stateless.WINDOW_ID);
 
     writer.input.put(3);
     writer.input.put(4);
@@ -1554,8 +1561,11 @@ public class AbstractFileOutputOperatorTest
         writer.input.put(i);
       }
       writer.endWindow();
-      evenOffsets.add(evenFile.length());
-      oddOffsets.add(oddFile.length());
+      if ((i % 2) == 1) {
+        writer.beforeCheckpoint(i);
+        evenOffsets.add(evenFile.length());
+        oddOffsets.add(oddFile.length());
+      }
     }
 
     writer.teardown();
@@ -1580,6 +1590,7 @@ public class AbstractFileOutputOperatorTest
     writer.input.put(2);
     writer.input.put(3);
     writer.endWindow();
+    writer.beforeCheckpoint(0);
 
     //failure and restored
     writer.setup(testMeta.testOperatorContext);
@@ -1757,10 +1768,11 @@ public class AbstractFileOutputOperatorTest
         writer.input.put(i);
       }
       writer.endWindow();
-      evenOffsets.add(evenCounterContext.getCounter());
-      oddOffsets.add(oddCounterContext.getCounter());
-      //evenOffsets.add(evenFile.length());
-      //oddOffsets.add(oddFile.length());
+      if ((i % 2) == 1) {
+        writer.beforeCheckpoint(i);
+        evenOffsets.add(evenCounterContext.getCounter());
+        oddOffsets.add(oddCounterContext.getCounter());
+      }
     }
 
     writer.teardown();

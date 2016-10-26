@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Set;
 
 import org.apache.apex.malhar.lib.state.spillable.Spillable;
@@ -33,7 +34,6 @@ import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.classification.InterfaceStability;
 
 import com.datatorrent.api.Context;
-import com.datatorrent.netlet.util.Slice;
 
 /**
  * Spillable session windowed storage.
@@ -52,7 +52,7 @@ public class SpillableSessionWindowedStorage<K, V> extends SpillableWindowedKeye
     if (keyToWindowsMap == null) {
       // NOTE: this will pose difficulties when we try to assign the entries to a time bucket later on.
       // This is logged in APEXMALHAR-2271
-      keyToWindowsMap = scc.newSpillableSetMultimap(bucket, keySerde, (Serde<Window.SessionWindow<K>, Slice>)(Serde)windowSerde);
+      keyToWindowsMap = scc.newSpillableSetMultimap(bucket, keySerde, (Serde<Window.SessionWindow<K>>)(Serde)windowSerde);
     }
   }
 
@@ -79,23 +79,19 @@ public class SpillableSessionWindowedStorage<K, V> extends SpillableWindowedKeye
   @Override
   public void migrateWindow(Window.SessionWindow<K> fromWindow, Window.SessionWindow<K> toWindow)
   {
-    Set<K> keys = windowToKeysMap.get(fromWindow);
-    if (keys == null) {
-      return;
+    K key = fromWindow.getKey();
+    ImmutablePair<Window, K> oldKey = new ImmutablePair<Window, K>(fromWindow, key);
+    ImmutablePair<Window, K> newKey = new ImmutablePair<Window, K>(toWindow, key);
+    V value = windowKeyToValueMap.get(oldKey);
+    if (value == null) {
+      throw new NoSuchElementException();
     }
-    windowKeyToValueMap.remove(toWindow);
-    for (K key : keys) {
-      windowToKeysMap.put(toWindow, key);
-      ImmutablePair<Window, K> oldKey = new ImmutablePair<Window, K>(fromWindow, key);
-      ImmutablePair<Window, K> newKey = new ImmutablePair<Window, K>(toWindow, key);
-
-      V value = windowKeyToValueMap.get(oldKey);
-      windowKeyToValueMap.remove(oldKey);
-      windowKeyToValueMap.put(newKey, value);
-      keyToWindowsMap.remove(key, fromWindow);
-      keyToWindowsMap.put(key, toWindow);
-    }
+    windowKeyToValueMap.remove(oldKey);
+    windowKeyToValueMap.put(newKey, value);
+    keyToWindowsMap.remove(key, fromWindow);
+    keyToWindowsMap.put(key, toWindow);
     windowToKeysMap.removeAll(fromWindow);
+    windowToKeysMap.put(toWindow, key);
   }
 
   @Override
@@ -106,7 +102,7 @@ public class SpillableSessionWindowedStorage<K, V> extends SpillableWindowedKeye
     if (sessionWindows != null) {
       for (Window.SessionWindow<K> window : sessionWindows) {
         if (timestamp > window.getBeginTimestamp()) {
-          if (window.getBeginTimestamp() + window.getDurationMillis() + gap > timestamp) {
+          if (window.getBeginTimestamp() + window.getDurationMillis() > timestamp) {
             results.add(new AbstractMap.SimpleEntry<>(window, windowKeyToValueMap.get(new ImmutablePair<Window, K>(window, key))));
           }
         } else if (timestamp < window.getBeginTimestamp()) {

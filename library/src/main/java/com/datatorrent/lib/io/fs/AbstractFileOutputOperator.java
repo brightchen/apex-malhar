@@ -110,7 +110,7 @@ import com.datatorrent.lib.counters.BasicCounters;
  * @since 2.0.0
  */
 @OperatorAnnotation(checkpointableWithinAppWindow = false)
-public abstract class AbstractFileOutputOperator<INPUT> extends BaseOperator implements Operator.CheckpointListener
+public abstract class AbstractFileOutputOperator<INPUT> extends BaseOperator implements Operator.CheckpointListener, Operator.CheckpointNotificationListener
 {
   private static final Logger LOG = LoggerFactory.getLogger(AbstractFileOutputOperator.class);
 
@@ -261,6 +261,8 @@ public abstract class AbstractFileOutputOperator<INPUT> extends BaseOperator imp
    */
   private Long expireStreamAfterAccessMillis;
   private final Set<String> filesWithOpenStreams;
+
+  private transient boolean initializeContext;
 
   /**
    * This input port receives incoming tuples.
@@ -966,13 +968,19 @@ public abstract class AbstractFileOutputOperator<INPUT> extends BaseOperator imp
   @Override
   public void beginWindow(long windowId)
   {
-    try {
-      Map<String, FSFilterStreamContext> openStreams = streamsCache.asMap();
-      for (FSFilterStreamContext streamContext : openStreams.values()) {
-        streamContext.initializeContext();
+    // All the filter state needs to be flushed to the disk. Not all filters allow a flush option, so the filters have
+    // to be closed and reopened. If no filter being is being used then it is a essentially a noop as the underlying
+    // FSDataOutputStream is not being closed in this operation.
+    if (initializeContext) {
+      try {
+        Map<String, FSFilterStreamContext> openStreams = streamsCache.asMap();
+        for (FSFilterStreamContext streamContext : openStreams.values()) {
+          streamContext.initializeContext();
+        }
+      } catch (IOException e) {
+        throw new RuntimeException(e);
       }
-    } catch (IOException e) {
-      throw new RuntimeException(e);
+      initializeContext = false;
     }
     currentWindow = windowId;
   }
@@ -980,18 +988,6 @@ public abstract class AbstractFileOutputOperator<INPUT> extends BaseOperator imp
   @Override
   public void endWindow()
   {
-    try {
-      Map<String, FSFilterStreamContext> openStreams = streamsCache.asMap();
-      for (FSFilterStreamContext streamContext: openStreams.values()) {
-        long start = System.currentTimeMillis();
-        streamContext.finalizeContext();
-        totalWritingTime += System.currentTimeMillis() - start;
-        //streamContext.resetFilter();
-      }
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-
     if (rotationWindows > 0) {
       if (++rotationCount == rotationWindows) {
         rotationCount = 0;
@@ -1235,6 +1231,23 @@ public abstract class AbstractFileOutputOperator<INPUT> extends BaseOperator imp
     @Override
     public void close() throws IOException
     {
+    }
+  }
+
+  @Override
+  public void beforeCheckpoint(long l)
+  {
+    try {
+      Map<String, FSFilterStreamContext> openStreams = streamsCache.asMap();
+      for (FSFilterStreamContext streamContext: openStreams.values()) {
+        long start = System.currentTimeMillis();
+        streamContext.finalizeContext();
+        totalWritingTime += System.currentTimeMillis() - start;
+        // Re-initialize context when next window starts after checkpoint
+        initializeContext = true;
+      }
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
   }
 
