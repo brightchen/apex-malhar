@@ -88,6 +88,13 @@ class StateTracker extends TimerTask
   @Override
   public void run()
   {
+    if(true) {
+        try {
+          Thread.sleep(100);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+    }
     synchronized (managedStateImpl.commitLock) {
       //freeing of state needs to be stopped during commit as commit results in transferring data to a state which
       // can be freed up as well.

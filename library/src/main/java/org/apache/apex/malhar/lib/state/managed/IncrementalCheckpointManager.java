@@ -176,10 +176,13 @@ public class IncrementalCheckpointManager extends FSWindowDataManager
       LOG.error("Error while transferring");
       Throwables.propagate(lthrowable);
     }
-    savedWindows.put(windowId, unsavedData);
+//    savedWindows.put(windowId, unsavedData);
 
     if (!skipWriteToWindowFile) {
       super.save(unsavedData, windowId);
+
+      //clear data
+      unsavedData.clear();
     }
   }
 

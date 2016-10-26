@@ -64,6 +64,21 @@ public class ManagedStateBenchmarkAppTest extends ManagedStateBenchmarkApp
     test(ExecMode.INSERT);
   }
 
+  @Test
+  public void testGetSync() throws Exception
+  {
+    test(ExecMode.GETSYNC);
+  }
+
+
+  @Test
+  public void testDonothing() throws Exception
+  {
+    test(ExecMode.DONOTHING);
+  }
+
+
+
   public void test(ExecMode exeMode) throws Exception
   {
     Configuration conf = new Configuration(false);

@@ -70,6 +70,17 @@ public class ManagedStateBenchmarkApp implements StreamingApplication
 
     dag.setAttribute(storeOperator, OperatorContext.STATS_LISTENERS, Lists.newArrayList((StatsListener)sl));
 
+    /**
+     * if don't set locality: setLocality(Locality.CONTAINER_LOCAL) will throw following exception
+     *
+     *  at java.util.Arrays.copyOf(Arrays.java:2271)
+  at java.io.ByteArrayOutputStream.grow(ByteArrayOutputStream.java:118)
+  at java.io.ByteArrayOutputStream.ensureCapacity(ByteArrayOutputStream.java:93)
+  at java.io.ByteArrayOutputStream.write(ByteArrayOutputStream.java:153)
+  at com.esotericsoftware.kryo.io.Output.flush(Output.java:163)
+  at com.esotericsoftware.kryo.io.Output.require(Output.java:142)
+  at org.apache.apex.malhar.lib.wal.FSWindowDataManager.toSlice(FSWindowDataManager.java:609)
+     */
     dag.addStream("Events", gen.data, storeOperator.input).setLocality(Locality.CONTAINER_LOCAL);
   }
 

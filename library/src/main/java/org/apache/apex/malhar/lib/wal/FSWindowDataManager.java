@@ -18,7 +18,6 @@
  */
 package org.apache.apex.malhar.lib.wal;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -38,6 +37,8 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.apex.malhar.lib.state.managed.IncrementalCheckpointManager;
 import org.apache.apex.malhar.lib.utils.FileContextUtils;
+import org.apache.apex.malhar.lib.utils.serde.SerializationBuffer;
+import org.apache.apex.malhar.lib.utils.serde.WindowedBlockStream;
 import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
@@ -45,7 +46,6 @@ import org.apache.hadoop.fs.RemoteIterator;
 
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
-import com.esotericsoftware.kryo.io.Output;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
@@ -592,15 +592,44 @@ public class FSWindowDataManager implements WindowDataManager
     }
   }
 
+  //TODO: need to work on how to reset buffer
+  protected SerializationBuffer serBuffer = new SerializationBuffer(new WindowedBlockStream());
+  protected final int TUPLE_PER_WINDOW = 1;
+  protected int tupleOfWindow = 0;
+  protected long windowId = 0;
+
+  private static final Logger logger = LoggerFactory.getLogger(FSWindowDataManager.class);
+
   private Slice toSlice(Object object)
   {
-    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    Output output = new Output(baos);
-    kryo.writeClassAndObject(output, object);
-    output.close();
-    byte[] bytes = baos.toByteArray();
+//    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+//    Output output = new Output(baos);
+//    kryo.writeClassAndObject(output, object);
+//    output.close();
+//    byte[] bytes = baos.toByteArray();
+//    logger.info("==== bytes length: {}", bytes.length);
+//
+//    return new Slice(bytes);
 
-    return new Slice(bytes);
+    {
+      if (windowId == 0 && tupleOfWindow == 0) {
+        serBuffer.beginWindow(windowId);
+      }
+      kryo.writeClassAndObject(serBuffer, object);
+      Slice slice = serBuffer.toSlice();
+      logger.info("==== buffer size: {}, capacity: {}", serBuffer.size(), serBuffer.capacity());
+      if (++tupleOfWindow == TUPLE_PER_WINDOW) {
+        serBuffer.endWindow();
+        //reset to the window
+        if (windowId > 1) {
+          serBuffer.completeWindow(windowId - 2);
+        }
+        ++windowId;
+        serBuffer.beginWindow(windowId);
+        tupleOfWindow = 0;
+      }
+      return slice;
+    }
   }
 
   protected Object fromSlice(Slice slice)
@@ -611,6 +640,7 @@ public class FSWindowDataManager implements WindowDataManager
     return object;
   }
 
+  @Override
   public long getLargestCompletedWindow()
   {
     return largestCompletedWindow;

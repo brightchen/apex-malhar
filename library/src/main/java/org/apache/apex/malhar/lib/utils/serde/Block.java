@@ -21,6 +21,8 @@ package org.apache.apex.malhar.lib.utils.serde;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.base.Throwables;
+
 import com.datatorrent.netlet.util.Slice;
 
 /**
@@ -109,7 +111,12 @@ public class Block
     capacity = (size + length) * 2;
 
     byte[] oldBuffer = buffer;
-    buffer = new byte[capacity];
+    try {
+      buffer = new byte[capacity];
+    } catch (OutOfMemoryError ofme) {
+      logger.error("Failed to try allocate memory with size: {}", capacity);
+      Throwables.propagate(ofme);
+    }
 
     /**
      * no slices are exposed in this block yet (this is the first object in this block).

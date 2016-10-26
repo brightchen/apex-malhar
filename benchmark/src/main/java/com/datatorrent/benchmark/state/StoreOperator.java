@@ -128,10 +128,10 @@ public class StoreOperator extends BaseOperator implements Operator.CheckpointNo
 
 
       case UPDATESYNC:
-//        keySliceForRead.buffer = tuple.getKey();
-//        keySliceForRead.offset = 0;
-//        keySliceForRead.length = tuple.getKey().length;
-//        store.getSync(getTimeByKey(tuple.getKey()), keySliceForRead);
+        keySliceForRead.buffer = tuple.getKey();
+        keySliceForRead.offset = 0;
+        keySliceForRead.length = tuple.getKey().length;
+        store.getSync(getTimeByKey(tuple.getKey()), keySliceForRead);
         insertValueToStore(tuple);
         break;
 
