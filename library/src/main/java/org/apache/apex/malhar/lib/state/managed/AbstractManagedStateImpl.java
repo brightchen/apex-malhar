@@ -259,6 +259,7 @@ public abstract class AbstractManagedStateImpl
       bucket = newBucket(bucketId);
       bucket.setup(this);
       buckets[bucketIdx] = bucket;
+      LOG.info("====total bucket number: {}", buckets.length);
     } else if (bucket.getBucketId() != bucketId) {
       handleBucketConflict(bucketIdx, bucketId);
     }

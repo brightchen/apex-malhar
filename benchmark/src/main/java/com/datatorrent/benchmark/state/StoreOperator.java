@@ -53,6 +53,7 @@ public class StoreOperator extends BaseOperator implements Operator.CheckpointNo
   }
 
   protected static final int numOfWindowPerStatistics = 120;
+  protected static final int BUCKET_NUM = 20;
 
   //this is the store we are going to use
   protected ManagedTimeUnifiedStateImpl store;
@@ -80,6 +81,8 @@ public class StoreOperator extends BaseOperator implements Operator.CheckpointNo
   public void setup(OperatorContext context)
   {
     logger.info("The execute mode is: {}", execMode.name());
+    //default is 100, which is too little
+    //store.setMaxMemorySize(1000000);
     store.setup(context);
     monitorService = ResourceMonitorService.create(60000).start();
   }

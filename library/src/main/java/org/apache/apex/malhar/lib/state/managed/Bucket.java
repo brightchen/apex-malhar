@@ -240,6 +240,7 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
 
     public DefaultBucket(long bucketId)
     {
+      LOG.info("====created a new bucket: {}", bucketId);
       this.bucketId = bucketId;
     }
 

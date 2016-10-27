@@ -31,6 +31,7 @@ import org.apache.hadoop.conf.Configuration;
 
 import com.google.common.collect.Lists;
 
+import com.datatorrent.api.Context;
 import com.datatorrent.api.Context.OperatorContext;
 import com.datatorrent.api.DAG;
 import com.datatorrent.api.DAG.Locality;
@@ -69,6 +70,7 @@ public class ManagedStateBenchmarkApp implements StreamingApplication
     storeOperator = dag.addOperator("Store", storeOperator);
 
     dag.setAttribute(storeOperator, OperatorContext.STATS_LISTENERS, Lists.newArrayList((StatsListener)sl));
+    dag.setAttribute(Context.OperatorContext.APPLICATION_WINDOW_COUNT, 100);
 
     /**
      * if don't set locality: setLocality(Locality.CONTAINER_LOCAL) will throw following exception
@@ -107,7 +109,7 @@ public class ManagedStateBenchmarkApp implements StreamingApplication
     public final transient DefaultOutputPort<KeyValPair<byte[], byte[]>> data = new DefaultOutputPort<KeyValPair<byte[], byte[]>>();
     int emitBatchSize = 1000;
     byte[] val = ByteBuffer.allocate(1000).putLong(1234).array();
-    int rate = 20000;
+    int rate = 100000;
     int emitCount = 0;
     private final Random random = new Random();
     private int range = 1000 * 60; // one minute range of hot keys
