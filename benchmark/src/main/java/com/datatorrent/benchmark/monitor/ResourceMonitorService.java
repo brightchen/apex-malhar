@@ -7,6 +7,8 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.apex.malhar.lib.utils.serde.BlockStreamMonitor;
+
 public class ResourceMonitorService
 {
   public static ResourceMonitorService create(long period)
@@ -32,6 +34,8 @@ public class ResourceMonitorService
     executorService = Executors.newSingleThreadScheduledExecutor();
     executorService.scheduleAtFixedRate(new LogGarbageCollectionTimeTask(period), 0, period, TimeUnit.MILLISECONDS);
     executorService.scheduleAtFixedRate(new LogSystemResourceTask(), 0, period, TimeUnit.MILLISECONDS);
+    executorService.scheduleAtFixedRate(new LogStreamCapacityTask(), 0, period, TimeUnit.MILLISECONDS);
+
     return this;
   }
 
@@ -74,4 +78,12 @@ public class ResourceMonitorService
     }
   }
 
+  public static class LogStreamCapacityTask implements Runnable
+  {
+    @Override
+    public void run()
+    {
+      BlockStreamMonitor.INSTANCE.logStreamCapacity();
+    }
+  }
 }

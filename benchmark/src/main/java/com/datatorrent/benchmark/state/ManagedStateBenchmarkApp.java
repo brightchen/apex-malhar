@@ -55,6 +55,8 @@ public class ManagedStateBenchmarkApp implements StreamingApplication
   protected StoreOperator storeOperator;
   protected int timeRange = 1000 * 60; // one minute range of hot keys
 
+  public static final int APPLICATION_WINDOW_COUNT = 20;
+
   @Override
   public void populateDAG(DAG dag, Configuration conf)
   {
@@ -70,7 +72,7 @@ public class ManagedStateBenchmarkApp implements StreamingApplication
     storeOperator = dag.addOperator("Store", storeOperator);
 
     dag.setAttribute(storeOperator, OperatorContext.STATS_LISTENERS, Lists.newArrayList((StatsListener)sl));
-    dag.setAttribute(Context.OperatorContext.APPLICATION_WINDOW_COUNT, 100);
+    dag.setAttribute(Context.OperatorContext.APPLICATION_WINDOW_COUNT, APPLICATION_WINDOW_COUNT);
 
     /**
      * if don't set locality: setLocality(Locality.CONTAINER_LOCAL) will throw following exception
@@ -109,7 +111,9 @@ public class ManagedStateBenchmarkApp implements StreamingApplication
     public final transient DefaultOutputPort<KeyValPair<byte[], byte[]>> data = new DefaultOutputPort<KeyValPair<byte[], byte[]>>();
     int emitBatchSize = 1000;
     byte[] val = ByteBuffer.allocate(1000).putLong(1234).array();
-    int rate = 100000;
+
+    //rate is for application window.
+    int rate = 100000 * APPLICATION_WINDOW_COUNT;
     int emitCount = 0;
     private final Random random = new Random();
     private int range = 1000 * 60; // one minute range of hot keys

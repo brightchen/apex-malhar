@@ -64,11 +64,13 @@ public class WindowedBlockStream extends BlockStream implements WindowListener, 
   public WindowedBlockStream()
   {
     super();
+    BlockStreamMonitor.INSTANCE.createdNewStream(this);
   }
 
   public WindowedBlockStream(int blockCapacity)
   {
     super(blockCapacity);
+    BlockStreamMonitor.INSTANCE.createdNewStream(this);
   }
 
   @Override
@@ -246,4 +248,24 @@ public class WindowedBlockStream extends BlockStream implements WindowListener, 
     }
   }
 
+  public void releaseAllFreeMemory()
+  {
+    int releasingBlocks = freeBlockIds.size();
+    int releasedBlocks = 0;
+    Iterator<Integer> iter = freeBlockIds.iterator();
+    while (releasedBlocks < releasingBlocks) {
+      //release blocks
+      int blockId = iter.next();
+      iter.remove();
+      blocks.remove(blockId);
+      releasedBlocks++;
+    }
+
+    /**
+     * report number of released blocks
+     */
+    if (releasedBlocks > 0) {
+      releaseStrategy.releasedBlocks(releasedBlocks);
+    }
+  }
 }

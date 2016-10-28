@@ -442,6 +442,16 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
     @Override
     public long freeMemory(long windowId) throws IOException
     {
+      //free all memory
+      this.flash.clear();
+      this.checkpointedData.clear();
+      if (cachedBucketMetas != null) {
+        cachedBucketMetas.clear();
+      }
+      if (committedData != null) {
+        committedData.clear();
+      }
+
       // calculate the size first and then send the release memory request. It could reduce the chance of conflict and increase the performance.
       long size = keyStream.dataSizeUpToWindow(windowId) + valueStream.dataSizeUpToWindow(windowId);
       windowsForFreeMemory.add(windowId);
@@ -459,6 +469,10 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
         long originSize = keyStream.size() + valueStream.size();
         keyStream.completeWindow(windowId);
         valueStream.completeWindow(windowId);
+
+        keyStream.releaseAllFreeMemory();
+        valueStream.releaseAllFreeMemory();
+
         memoryFreed += originSize - (keyStream.size() + valueStream.size());
       }
 

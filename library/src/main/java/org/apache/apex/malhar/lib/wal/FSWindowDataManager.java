@@ -623,6 +623,7 @@ public class FSWindowDataManager implements WindowDataManager
         //reset to the window
         if (windowId > 1) {
           serBuffer.completeWindow(windowId - 2);
+          serBuffer.getWindowedBlockStream().releaseAllFreeMemory();
         }
         ++windowId;
         serBuffer.beginWindow(windowId);
