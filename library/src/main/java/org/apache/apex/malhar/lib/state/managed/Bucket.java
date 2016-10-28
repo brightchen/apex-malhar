@@ -442,7 +442,7 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
     @Override
     public long freeMemory(long windowId) throws IOException
     {
-      //free all memory
+      //free all memory, these memory should be released. else will use up the heap
       this.flash.clear();
       this.checkpointedData.clear();
       if (cachedBucketMetas != null) {
