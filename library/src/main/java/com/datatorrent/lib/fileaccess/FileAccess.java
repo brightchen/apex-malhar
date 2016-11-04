@@ -151,7 +151,7 @@ public interface FileAccess extends Closeable
      * @param value
      * @throws IOException
      */
-    void append(byte[] key, byte[] value) throws IOException;
+    void append(Slice key, Slice value) throws IOException;
 
     /**
      * Returns number of bytes written to the underlying stream.
