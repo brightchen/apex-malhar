@@ -52,7 +52,7 @@ public class StoreOperator extends BaseOperator implements Operator.CheckpointNo
     DO_NOTHING
   }
 
-  private static final int numOfWindowPerStatistics = 120;
+  private int numOfWindowPerStatistics = 120;
   private static final int BUCKET_NUM = 20;
 
   //this is the store we are going to use
@@ -64,7 +64,7 @@ public class StoreOperator extends BaseOperator implements Operator.CheckpointNo
   private int windowCountPerStatistics = 0;
   private long statisticsBeginTime = 0;
 
-  private ExecMode execMode = ExecMode.INSERT;
+  public ExecMode execMode = ExecMode.INSERT;
   private int timeRange = 1000 * 60;
 
   private transient ResourceMonitorService monitorService;
@@ -288,4 +288,8 @@ public class StoreOperator extends BaseOperator implements Operator.CheckpointNo
     this.timeRange = timeRange;
   }
 
+  public void setNumOfWindowPerStatistics(int numOfWindowPerStatistics)
+  {
+    this.numOfWindowPerStatistics = numOfWindowPerStatistics;
+  }
 }

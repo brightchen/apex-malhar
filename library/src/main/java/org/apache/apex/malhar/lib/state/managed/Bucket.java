@@ -498,6 +498,9 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
     @Override
     public Map<Slice, BucketedValue> checkpoint(long windowId)
     {
+      //For debug only
+      LOG.info("checkpoint: Bucket: {}, windowId: {}", System.identityHashCode(this) % 100000, windowId % 100000);
+
       releaseMemory();
       try {
         //transferring the data from flash to check-pointed state in finally block and re-initializing the flash.
@@ -511,6 +514,12 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
     @Override
     public void committed(long committedWindowId)
     {
+      //For debug only
+      if (!flash.isEmpty() && (checkpointedData.isEmpty() || checkpointedData.get(committedWindowId) == null)) {
+        LOG.warn("==== Probably commit before checkpoint. Bucket: {}, windowId: {}", System.identityHashCode(this) % 100000,
+          committedWindowId % 100000);
+      }
+
       releaseMemory();
       Iterator<Map.Entry<Long, Map<Slice, BucketedValue>>> stateIterator = checkpointedData.entrySet().iterator();
 
