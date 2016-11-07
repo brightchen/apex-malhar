@@ -431,6 +431,10 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
       }
     }
 
+
+    //for test
+    private long freedWindowId = -2;
+
     /**
      * Free memory up to the given windowId
      * This method will be called by another thread. Adding concurrency control to Stream would impact the performance.
@@ -442,6 +446,7 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
     @Override
     public long freeMemory(long windowId) throws IOException
     {
+
       long memoryFreed = 0;
       Long clearWindowId;
 
@@ -465,6 +470,13 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
 
       }
       sizeInBytes.getAndAdd(-memoryFreed);
+
+      //for test
+      if (memoryFreed > 0) {
+        LOG.info("==== freeMemory: bucket: {}; window: {}, freed space: {}", System.identityHashCode(this) % 100000, windowId % 100000, memoryFreed);
+        freedWindowId = windowId;
+      }
+
       LOG.debug("space freed {} {}", bucketId, memoryFreed);
 
       //add the windowId to the queue to let operator thread release memory from keyStream and valueStream
@@ -495,11 +507,13 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
       return memoryFreed;
     }
 
+    private long lastCheckpointWindowId = 0;
     @Override
     public Map<Slice, BucketedValue> checkpoint(long windowId)
     {
       //For debug only
-      LOG.info("checkpoint: Bucket: {}, windowId: {}", System.identityHashCode(this) % 100000, windowId % 100000);
+      lastCheckpointWindowId = windowId;
+      LOG.info("==== checkpoint: Bucket: {}, windowId: {}", System.identityHashCode(this) % 100000, windowId % 100000);
 
       releaseMemory();
       try {
@@ -511,13 +525,16 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
       }
     }
 
+    private long lastCommittedWindowId = 0;
     @Override
     public void committed(long committedWindowId)
     {
       //For debug only
-      if (!flash.isEmpty() && (checkpointedData.isEmpty() || checkpointedData.get(committedWindowId) == null)) {
-        LOG.warn("==== Probably commit before checkpoint. Bucket: {}, windowId: {}", System.identityHashCode(this) % 100000,
-          committedWindowId % 100000);
+      LOG.info("==== committed: bucket: {}, windowId: {}", System.identityHashCode(this) % 100000, committedWindowId % 100000);
+      lastCommittedWindowId = committedWindowId;
+      if(lastCommittedWindowId < lastCheckpointWindowId) {
+        LOG.warn("==== committed before checkpoint: bucket: {}, last committed id: {}; last checkpoint id: {}", System.identityHashCode(this) % 100000,
+          lastCommittedWindowId % 100000, lastCheckpointWindowId % 100000);
       }
 
       releaseMemory();
