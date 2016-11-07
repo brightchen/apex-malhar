@@ -381,6 +381,16 @@ public abstract class AbstractManagedStateImpl
   @Override
   public void committed(long windowId)
   {
+    //for test
+    LOG.info("==== Committed: windowId: {}", windowId % 100000);
+    StringBuilder sb = new StringBuilder();
+    for (Bucket bucket : buckets) {
+      if (bucket != null) {
+        sb.append(bucket.getBucketId()).append(", ");
+      }
+    }
+    LOG.info("==== buckets:\n {}", sb.toString());
+
     synchronized (commitLock) {
       try {
         for (Bucket bucket : buckets) {

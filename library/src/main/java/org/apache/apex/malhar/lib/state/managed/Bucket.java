@@ -472,7 +472,7 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
       sizeInBytes.getAndAdd(-memoryFreed);
 
       //for test
-      if (memoryFreed > 0) {
+      if (memoryFreed > 0 || windowId > freedWindowId) {
         LOG.info("==== freeMemory: bucket: {}; window: {}, freed space: {}", System.identityHashCode(this) % 100000, windowId % 100000, memoryFreed);
         freedWindowId = windowId;
       }
