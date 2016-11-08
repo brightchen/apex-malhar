@@ -530,12 +530,12 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
     public void committed(long committedWindowId)
     {
       //For debug only
-      LOG.info("==== committed: bucket: {}, windowId: {}", System.identityHashCode(this) % 100000, committedWindowId % 100000);
-      lastCommittedWindowId = committedWindowId;
-      if(lastCommittedWindowId < lastCheckpointWindowId) {
-        LOG.warn("==== committed before checkpoint: bucket: {}, last committed id: {}; last checkpoint id: {}", System.identityHashCode(this) % 100000,
-          lastCommittedWindowId % 100000, lastCheckpointWindowId % 100000);
-      }
+//      LOG.info("==== committed: bucket: {}, windowId: {}", System.identityHashCode(this) % 100000, committedWindowId % 100000);
+//      lastCommittedWindowId = committedWindowId;
+//      if(lastCommittedWindowId < lastCheckpointWindowId) {
+//        LOG.warn("==== committed before checkpoint: bucket: {}, last committed id: {}; last checkpoint id: {}", System.identityHashCode(this) % 100000,
+//          lastCommittedWindowId % 100000, lastCheckpointWindowId % 100000);
+//      }
 
       releaseMemory();
       Iterator<Map.Entry<Long, Map<Slice, BucketedValue>>> stateIterator = checkpointedData.entrySet().iterator();
@@ -612,6 +612,13 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
         builder.append(">");
         throw new RuntimeException(builder.toString());
       }
+    }
+
+    public String getMemoryUsage()
+    {
+      StringBuilder sb = new StringBuilder();
+      sb.append("flash: " + flash.size() + "; checkpointed: " + checkpointedData.size() + "; committed: " + committedData.size());
+      return sb.toString();
     }
 
     @VisibleForTesting

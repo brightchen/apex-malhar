@@ -90,6 +90,10 @@ class StateTracker extends TimerTask
   public void run()
   {
     synchronized (managedStateImpl.commitLock) {
+      if (managedStateImpl.getCheckpointManager().getLastTransferredWindow() < 0) {
+        return;
+      }
+
       //freeing of state needs to be stopped during commit as commit results in transferring data to a state which
       // can be freed up as well.
       long bytesSum = 0;

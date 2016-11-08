@@ -48,7 +48,7 @@ import com.datatorrent.lib.util.KeyValPair;
 @ApplicationAnnotation(name = "ManagedStateBenchmark")
 public class ManagedStateBenchmarkApp implements StreamingApplication
 {
-  public static final int APP_WINDOWS = 120;
+  public static final int APP_WINDOWS = 20;
   protected static final String PROP_STORE_PATH = "dt.application.ManagedStateBenchmark.storeBasePath";
   protected static final String DEFAULT_BASE_PATH = "ManagedStateBenchmark/Store";
 

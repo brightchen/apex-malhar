@@ -381,16 +381,6 @@ public abstract class AbstractManagedStateImpl
   @Override
   public void committed(long windowId)
   {
-    //for test
-    LOG.info("==== Committed: windowId: {}", windowId % 100000);
-    StringBuilder sb = new StringBuilder();
-    for (Bucket bucket : buckets) {
-      if (bucket != null) {
-        sb.append(System.identityHashCode(bucket) % 100000).append(", ");
-      }
-    }
-    LOG.info("==== buckets:\n {}", sb.toString());
-
     synchronized (commitLock) {
       try {
         for (Bucket bucket : buckets) {
@@ -405,6 +395,17 @@ public abstract class AbstractManagedStateImpl
         throw new RuntimeException("committing " + windowId, e);
       }
     }
+
+    //for test
+    LOG.info("==== Committed: windowId: {}", windowId % 100000);
+    StringBuilder sb = new StringBuilder();
+    for (Bucket bucket : buckets) {
+      if (bucket != null) {
+        sb.append(System.identityHashCode(bucket) % 100000).append(": ").append(((Bucket.DefaultBucket)bucket).getMemoryUsage()).append("\n");
+      }
+    }
+    LOG.info("==== buckets:\n {}", sb.toString());
+
   }
 
   /**
