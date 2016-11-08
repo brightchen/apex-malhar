@@ -386,7 +386,7 @@ public abstract class AbstractManagedStateImpl
     StringBuilder sb = new StringBuilder();
     for (Bucket bucket : buckets) {
       if (bucket != null) {
-        sb.append(bucket.getBucketId()).append(", ");
+        sb.append(System.identityHashCode(bucket) % 100000).append(", ");
       }
     }
     LOG.info("==== buckets:\n {}", sb.toString());

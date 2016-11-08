@@ -38,7 +38,7 @@
   <properties>
     <apex.apppackage.classpath>lib/*.jar</apex.apppackage.classpath>
     <maven.deploy.skip>true</maven.deploy.skip>
-    <skipTests>true</skipTests>
+    <!--skipTests>true</skipTests-->
     <semver.plugin.skip>true</semver.plugin.skip>
     <checkstyle.console>false</checkstyle.console>
   </properties>

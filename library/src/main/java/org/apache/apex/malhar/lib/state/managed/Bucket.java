@@ -512,8 +512,8 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
     public Map<Slice, BucketedValue> checkpoint(long windowId)
     {
       //For debug only
-      lastCheckpointWindowId = windowId;
-      LOG.info("==== checkpoint: Bucket: {}, windowId: {}", System.identityHashCode(this) % 100000, windowId % 100000);
+//      lastCheckpointWindowId = windowId;
+//      LOG.info("==== checkpoint: Bucket: {}, windowId: {}", System.identityHashCode(this) % 100000, windowId % 100000);
 
       releaseMemory();
       try {
