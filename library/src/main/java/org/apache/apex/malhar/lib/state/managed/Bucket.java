@@ -473,7 +473,7 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
 
       //for test
       if (memoryFreed > 0 || windowId > freedWindowId) {
-        LOG.info("==== freeMemory: bucket: {}; window: {}, freed space: {}", System.identityHashCode(this) % 100000, windowId % 100000, memoryFreed);
+        LOG.info("==== freeMemory: bucket: {}; window: {}, freed space: {}, committedData size: {}", System.identityHashCode(this) % 100000, windowId % 100000, memoryFreed, committedData.size());
         freedWindowId = windowId;
       }
 
@@ -574,7 +574,9 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
             }
           }
           sizeInBytes.getAndAdd(-memoryFreed);
-          committedData.put(savedWindow, bucketData);
+          if (!bucketData.isEmpty()) {
+            committedData.put(savedWindow, bucketData);
+          }
           stateIterator.remove();
         } else {
           break;

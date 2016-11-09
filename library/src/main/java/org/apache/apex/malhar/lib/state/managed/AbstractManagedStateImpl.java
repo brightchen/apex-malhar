@@ -158,8 +158,9 @@ public abstract class AbstractManagedStateImpl
 
   @NotNull
   @FieldSerializer.Bind(JavaSerializer.class)
-  private Duration checkStateSizeInterval = Duration.millis(
-      DAGContext.STREAMING_WINDOW_SIZE_MILLIS.defaultValue * OperatorContext.APPLICATION_WINDOW_COUNT.defaultValue);
+//  private Duration checkStateSizeInterval = Duration.millis(
+//      DAGContext.STREAMING_WINDOW_SIZE_MILLIS.defaultValue * OperatorContext.APPLICATION_WINDOW_COUNT.defaultValue);
+  private Duration checkStateSizeInterval = Duration.millis(DAGContext.STREAMING_WINDOW_SIZE_MILLIS.defaultValue * 5);
 
   @FieldSerializer.Bind(JavaSerializer.class)
   private Duration durationPreventingFreeingSpace;

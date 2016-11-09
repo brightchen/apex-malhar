@@ -20,6 +20,7 @@ package org.apache.apex.malhar.lib.state.managed;
 
 import java.io.IOException;
 import java.util.Comparator;
+import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
@@ -32,6 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
 
 /**
  * Tracks the size of state in memory and evicts buckets.
@@ -89,10 +91,13 @@ class StateTracker extends TimerTask
   @Override
   public void run()
   {
-    synchronized (managedStateImpl.commitLock) {
+    synchronized (managedStateImpl.commitLock)
+    {
       if (managedStateImpl.getCheckpointManager().getLastTransferredWindow() < 0) {
         return;
       }
+
+      long beginTime = System.currentTimeMillis();
 
       //freeing of state needs to be stopped during commit as commit results in transferring data to a state which
       // can be freed up as well.
@@ -103,6 +108,7 @@ class StateTracker extends TimerTask
         }
       }
 
+
       if (bytesSum > managedStateImpl.getMaxMemorySize()) {
         Duration duration = managedStateImpl.getDurationPreventingFreeingSpace();
         long durationMillis = 0;
@@ -110,8 +116,14 @@ class StateTracker extends TimerTask
           durationMillis = duration.getMillis();
         }
 
+        Set<BucketIdTimeWrapper> bucketInfos = Sets.newHashSet();
+        for(BucketIdTimeWrapper wrapper : bucketHeap) {
+          bucketInfos.add(wrapper);
+        }
+
         BucketIdTimeWrapper idTimeWrapper;
-        while (bytesSum > managedStateImpl.getMaxMemorySize() && bucketHeap.size() > 0 &&
+        int i = 0;
+        while (i++ < 10 && bytesSum > managedStateImpl.getMaxMemorySize() && bucketHeap.size() > 0 &&
             null != (idTimeWrapper = bucketHeap.first())) {
           //trigger buckets to free space
 
@@ -135,11 +147,14 @@ class StateTracker extends TimerTask
               }
               bytesSum -= sizeFreed;
             }
-            bucketHeap.remove(idTimeWrapper);
-            bucketAccessTimes.remove(bucketId);
+            if (bucket.getSizeInBytes() == 0) {
+              bucketHeap.remove(idTimeWrapper);
+              bucketAccessTimes.remove(bucketId);
+            }
           }
         }
       }
+      LOG.info("==== free memory spent time: {}", System.currentTimeMillis() - beginTime);
     }
   }
 
