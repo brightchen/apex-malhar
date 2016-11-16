@@ -26,6 +26,7 @@ import java.util.Set;
 import javax.validation.constraints.NotNull;
 
 import org.apache.apex.malhar.lib.state.BucketedState;
+import org.apache.apex.malhar.lib.state.managed.ManagedTimeUnifiedStateImpl;
 import org.apache.apex.malhar.lib.state.managed.TimeExtractor;
 import org.apache.apex.malhar.lib.utils.serde.AffixKeyValueSerdeManager;
 import org.apache.apex.malhar.lib.utils.serde.BufferSlice;
@@ -237,12 +238,25 @@ public class SpillableMapImpl<K, V> implements Spillable.SpillableMap<K, V>, Spi
   public void endWindow()
   {
     for (K key: cache.getChangedKeys()) {
-      store.put(getBucket(key), keyValueSerdeManager.serializeDataKey(key, true),
+      //the getBucket() returned in fact is time, the bucket assign then assigned the bucketId
+      long timeOrBucketId = getBucket(key);
+      long bucketId = timeOrBucketId;
+      if (store instanceof ManagedTimeUnifiedStateImpl) {
+        bucketId = ((ManagedTimeUnifiedStateImpl)store).getTimeBucketId(timeOrBucketId);
+      }
+      keyValueSerdeManager.currentBucketId(bucketId);
+      store.put(timeOrBucketId, keyValueSerdeManager.serializeDataKey(key, true),
           keyValueSerdeManager.serializeValue(cache.get(key)));
     }
 
     for (K key: cache.getRemovedKeys()) {
-      store.put(getBucket(key), keyValueSerdeManager.serializeDataKey(key, true), BufferSlice.EMPTY_SLICE);
+      long timeOrBucketId = getBucket(key);
+      long bucketId = timeOrBucketId;
+      if (store instanceof ManagedTimeUnifiedStateImpl) {
+        bucketId = ((ManagedTimeUnifiedStateImpl)store).getTimeBucketId(timeOrBucketId);
+      }
+      keyValueSerdeManager.currentBucketId(bucketId);
+      store.put(timeOrBucketId, keyValueSerdeManager.serializeDataKey(key, true), BufferSlice.EMPTY_SLICE);
     }
     cache.endWindow();
     keyValueSerdeManager.resetReadBuffer();
