@@ -22,8 +22,10 @@ import java.util.Map;
 
 import javax.validation.constraints.NotNull;
 
+import org.apache.apex.malhar.lib.state.managed.ManagedTimeUnifiedStateImpl;
 import org.apache.apex.malhar.lib.state.spillable.Spillable;
 import org.apache.apex.malhar.lib.state.spillable.SpillableComplexComponent;
+import org.apache.apex.malhar.lib.state.spillable.SpillableStateStore;
 import org.apache.apex.malhar.lib.utils.serde.GenericSerde;
 import org.apache.apex.malhar.lib.utils.serde.Serde;
 import org.apache.apex.malhar.lib.window.Window;
@@ -140,5 +142,15 @@ public class SpillableWindowedPlainStorage<T> implements WindowedStorage.Windowe
   @Override
   public void teardown()
   {
+  }
+
+  @Override
+  public void purge(long horizonMillis)
+  {
+    SpillableStateStore store = scc.getStore();
+    if (store instanceof ManagedTimeUnifiedStateImpl) {
+      ManagedTimeUnifiedStateImpl timeState = (ManagedTimeUnifiedStateImpl)store;
+      timeState.purgeTimeBucketsLessThanEqualTo(horizonMillis - 1);
+    }
   }
 }

@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 import javax.validation.ValidationException;
 
@@ -89,6 +90,8 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
   private long currentDerivedTimestamp = -1;
   private long timeIncrement;
   protected long fixedWatermarkMillis = -1;
+  private transient long streamingWindowId;
+  private transient TreeMap<Long, Long> streamingWindowToLatenessHorizon = new TreeMap<>();
 
   private Map<String, Component<Context.OperatorContext>> components = new HashMap<>();
 
@@ -465,6 +468,7 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
     } else {
       currentDerivedTimestamp += timeIncrement;
     }
+    streamingWindowId = windowId;
   }
 
   /**
@@ -517,6 +521,7 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
           }
         }
       }
+      streamingWindowToLatenessHorizon.put(streamingWindowId, horizon);
       controlOutput.emit(new WatermarkImpl(nextWatermark));
       this.currentWatermark = nextWatermark;
     }
@@ -617,6 +622,15 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
       if (component instanceof CheckpointNotificationListener) {
         ((CheckpointNotificationListener)component).committed(windowId);
       }
+    }
+    Long horizon = streamingWindowToLatenessHorizon.floorKey(windowId);
+    if (horizon != null) {
+      windowStateMap.purge(horizon);
+      dataStorage.purge(horizon);
+      if (retractionStorage != null) {
+        retractionStorage.purge(horizon);
+      }
+      streamingWindowToLatenessHorizon.headMap(windowId, true).clear();
     }
   }
 }
