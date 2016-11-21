@@ -48,7 +48,7 @@ import com.datatorrent.netlet.util.Slice;
 
 /**
  * Manages state which is written to files by windows. The state from the window files are then transferred to bucket
- * data files. This class listens to time expiry events issued by {@link TimeBucketAssigner}.
+ * data files. This class listens to time expiry events issued by {@link MovingBoundaryTimeBucketAssigner}.
  *
  * This component is also responsible for purging old time buckets.
  *

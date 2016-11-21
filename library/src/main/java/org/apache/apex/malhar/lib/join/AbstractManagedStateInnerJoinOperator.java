@@ -27,6 +27,7 @@ import java.util.concurrent.Future;
 import org.joda.time.Duration;
 import org.apache.apex.malhar.lib.state.managed.ManagedTimeStateImpl;
 import org.apache.apex.malhar.lib.state.managed.ManagedTimeStateMultiValue;
+import org.apache.apex.malhar.lib.state.managed.MovingBoundaryTimeBucketAssigner;
 import org.apache.apex.malhar.lib.state.spillable.Spillable;
 import org.apache.hadoop.fs.Path;
 import com.google.common.collect.Maps;
@@ -72,8 +73,12 @@ public abstract class AbstractManagedStateInnerJoinOperator<K,T> extends Abstrac
       stream1Store.getTimeBucketAssigner().setBucketSpan(Duration.millis(bucketSpanTime));
       stream2Store.getTimeBucketAssigner().setBucketSpan(Duration.millis(bucketSpanTime));
     }
-    stream1Store.getTimeBucketAssigner().setExpireBefore(Duration.millis(getExpiryTime()));
-    stream2Store.getTimeBucketAssigner().setExpireBefore(Duration.millis(getExpiryTime()));
+    if (stream1Store.getTimeBucketAssigner() instanceof MovingBoundaryTimeBucketAssigner) {
+      ((MovingBoundaryTimeBucketAssigner)stream1Store.getTimeBucketAssigner()).setExpireBefore(Duration.millis(getExpiryTime()));
+    }
+    if (stream2Store.getTimeBucketAssigner() instanceof MovingBoundaryTimeBucketAssigner) {
+      ((MovingBoundaryTimeBucketAssigner)stream1Store.getTimeBucketAssigner()).setExpireBefore(Duration.millis(getExpiryTime()));
+    }
 
     stream1Data = new ManagedTimeStateMultiValue(stream1Store, !isLeftKeyPrimary());
     stream2Data = new ManagedTimeStateMultiValue(stream2Store, !isRightKeyPrimary());
