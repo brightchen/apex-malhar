@@ -64,6 +64,11 @@ public class ManagedTimeUnifiedStateImpl extends AbstractManagedStateImpl implem
     return timeBucketAssigner.getNumBuckets();
   }
 
+  public long getTimeBucketId(long time)
+  {
+    return timeBucketAssigner.getTimeBucketAndAdjustBoundaries(time);
+  }
+
   @Override
   public void put(long time, @NotNull Slice key, @NotNull Slice value)
   {
@@ -204,7 +209,7 @@ public class ManagedTimeUnifiedStateImpl extends AbstractManagedStateImpl implem
     @Override
     protected void addBucketName(long bucketId)
     {
-      long operatorId = (long)managedStateContext.getOperatorContext().getId();
+      long operatorId = managedStateContext.getOperatorContext().getId();
       if (!bucketNamesOnFS.contains(operatorId)) {
         bucketNamesOnFS.add(operatorId);
       }
