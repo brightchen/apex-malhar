@@ -393,6 +393,22 @@ public abstract class AbstractManagedStateImpl
         throw new RuntimeException("committing " + windowId, e);
       }
     }
+
+    logBucketMemoryUsage();
+  }
+
+  protected void logBucketMemoryUsage()
+  {
+    StringBuilder sb = new StringBuilder();
+    for (Bucket bucket : buckets) {
+      if (bucket != null) {
+        String memoryUsage = ((Bucket.DefaultBucket)bucket).memoryUsage();
+        if (!memoryUsage.isEmpty()) {
+          sb.append(memoryUsage).append("\n");
+        }
+      }
+    }
+    LOG.info("buckets: {}; Detail:\n{}", buckets.length, sb.toString());
   }
 
   /**

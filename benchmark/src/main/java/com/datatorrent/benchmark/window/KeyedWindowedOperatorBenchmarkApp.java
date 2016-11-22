@@ -103,7 +103,7 @@ public class KeyedWindowedOperatorBenchmarkApp extends AbstractWindowedOperatorB
     public void emitTuples()
     {
       for (int i = 0; i < emitBatchSize && emitCount < rate; i++) {
-        data.emit(new Tuple.TimestampedTuple<KeyValPair<String, Long>>(System.currentTimeMillis() - random.nextInt(60000),
+        data.emit(new Tuple.TimestampedTuple<KeyValPair<String, Long>>(System.currentTimeMillis(), //- random.nextInt(60000),
             new KeyValPair<String, Long>("" + random.nextInt(10000), (long)random.nextInt(100))));
         emitCount++;
       }

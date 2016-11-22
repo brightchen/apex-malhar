@@ -493,9 +493,11 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
         memoryFreed += originSize - (keyStream.size() + valueStream.size());
       }
 
-      //release the free memory immediately
-      keyStream.releaseAllFreeMemory();
-      valueStream.releaseAllFreeMemory();
+      if(memoryFreed > 0) {
+        //release the free memory immediately
+        keyStream.releaseAllFreeMemory();
+        valueStream.releaseAllFreeMemory();
+      }
 
       return memoryFreed;
     }
@@ -626,6 +628,14 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
     public WindowedBlockStream getValueStream()
     {
       return valueStream;
+    }
+
+    public String memoryUsage()
+    {
+      if(sizeInBytes.get() == 0 && keyStream.size() == 0 && valueStream.size() == 0 && flash.size() == 0 && checkpointedData.size() == 0 && committedData.size() == 0)
+        return "";
+      return "bucket: " + bucketId + "; sizeInBytes: " + sizeInBytes.get() + "; keyStream size: " + keyStream.size() + "; valueStream size: " + valueStream.size()
+      + "; flash size: " + flash.size() + "; checkpointed size: " + checkpointedData.size() + "; committed size: " + committedData.size();
     }
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultBucket.class);
