@@ -41,7 +41,7 @@ public class SerdePerformanceTest
   public void testKryoSerde()
   {
     long beginTime = System.currentTimeMillis();
-    testSerde(new GenericSerde<String>());
+    testSerde(new GenericSerde<String>(String.class));
     logger.info("Generic Serde cost: {}", System.currentTimeMillis() - beginTime);
 
     beginTime = System.currentTimeMillis();
