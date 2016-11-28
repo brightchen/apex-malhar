@@ -69,21 +69,30 @@ public class KeyedWindowedOperatorBenchmarkApp extends AbstractWindowedOperatorB
       droppedCount++;
     }
 
+    private long endWindowCost = 0;
+    private int processWindows = 0;
     @Override
     public void endWindow()
     {
+      long endWindowBeginTime = System.currentTimeMillis();
+      //the bottle neck is endWindow()
       super.endWindow();
+      endWindowCost += System.currentTimeMillis() - endWindowBeginTime;
+
       if (++windowCount == logWindows) {
         long endTime = System.currentTimeMillis();
         tupleCount -= droppedCount;
         totalCount += tupleCount;
-        logger.info("total: count: {}; time: {}; average: {}; period: count: {}; dropped: {}; time: {}; average: {}",
+        logger.info("total: count: {}; time: {}; average: {}; period: count: {}; dropped: {}; time: {}; average: {}, endWindow cost: {}",
             totalCount, endTime - totalBeginTime, totalCount * 1000 / (endTime - totalBeginTime),
-            tupleCount, droppedCount, endTime - beginTime, tupleCount * 1000 / (endTime - beginTime));
+            tupleCount, droppedCount, endTime - beginTime, tupleCount * 1000 / (endTime - beginTime),
+            endWindowCost);
         windowCount = 0;
         beginTime = System.currentTimeMillis();
         tupleCount = 0;
         droppedCount = 0;
+
+        endWindowCost = 0;
       }
     }
 

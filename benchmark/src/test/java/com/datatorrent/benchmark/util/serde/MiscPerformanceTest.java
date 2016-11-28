@@ -92,6 +92,7 @@ public class MiscPerformanceTest
     long genericSerdeCost = System.currentTimeMillis() - beginTime;
     logger.info("Generic Serde cost for ImmutablePair: {}", genericSerdeCost);
 
+
     beginTime = System.currentTimeMillis();
     Kryo kryo = new Kryo();
     for(int i=0; i<serdeDataSize; ++i) {
@@ -100,7 +101,18 @@ public class MiscPerformanceTest
     }
     buffer.release();
     long kryoSerdeCost = System.currentTimeMillis() - beginTime;
-    logger.info("Kryo Serde cost for ImmutablePair: {}", kryoSerdeCost);
+    logger.info("Kryo Serde cost for ImmutablePair without class info: {}", kryoSerdeCost);
+
+
+    beginTime = System.currentTimeMillis();
+    Kryo kryo1 = new Kryo();
+    for(int i=0; i<serdeDataSize; ++i) {
+      kryo1.writeClassAndObject(buffer, generatePair(beginTime));
+      buffer.toSlice();
+    }
+    buffer.release();
+    long kryoSerdeCost2 = System.currentTimeMillis() - beginTime;
+    logger.info("Kryo Serde cost for ImmutablePair with class info: {}", kryoSerdeCost2);
   }
 
   @Test
@@ -142,6 +154,44 @@ public class MiscPerformanceTest
   protected ImmutablePair generatePair(long now)
   {
     return new ImmutablePair(new Window.TimeWindow<>(now + random.nextInt(100), random.nextInt(100)), "" + random.nextInt(1000));
+  }
+
+  @Test
+  public void testCompareEquals()
+  {
+    final int loop = 10000000;
+    boolean isTrue;
+
+    long beginTime = System.currentTimeMillis();
+    for (int i = 0; i < loop; ++i) {
+      ImmutablePair pair1 = new ImmutablePair(new Window.TimeWindow<>(beginTime + random.nextInt(100), random.nextInt(100)), "" + random.nextInt(1000));
+      isTrue = pair1 instanceof Map.Entry<?, ?>;
+    }
+    long spent1 = System.currentTimeMillis() - beginTime;
+
+    beginTime = System.currentTimeMillis();
+    for (int i = 0; i < loop; ++i) {
+      ImmutablePair pair1 = new ImmutablePair(new Window.TimeWindow<>(beginTime + random.nextInt(100), random.nextInt(100)), "" + random.nextInt(1000));
+    }
+    long spent2 = System.currentTimeMillis() - beginTime;
+    logger.info("instanceof cost: {}", spent1 - spent2);
+
+
+    beginTime = System.currentTimeMillis();
+    for (int i = 0; i < loop; ++i) {
+      Pair pair2 = new Pair(new Window.TimeWindow<>(beginTime + random.nextInt(100), random.nextInt(100)), "" + random.nextInt(1000));
+      isTrue = (pair2.getClass() == Pair.class);
+    }
+    long spent3 = System.currentTimeMillis() - beginTime;
+
+    beginTime = System.currentTimeMillis();
+    for (int i = 0; i < loop; ++i) {
+      Pair pair2 = new Pair(new Window.TimeWindow<>(beginTime + random.nextInt(100), random.nextInt(100)), "" + random.nextInt(1000));
+    }
+    long spent4 = System.currentTimeMillis() - beginTime;
+
+
+    logger.info("getClass cost: {}",spent3 - spent4);
   }
 
   protected static class Pair<F, S> implements Serializable

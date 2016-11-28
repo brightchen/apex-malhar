@@ -25,6 +25,9 @@ import java.util.Set;
 
 import javax.validation.constraints.NotNull;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import org.apache.apex.malhar.lib.state.BucketedState;
 import org.apache.apex.malhar.lib.state.managed.ManagedTimeUnifiedStateImpl;
 import org.apache.apex.malhar.lib.state.managed.TimeExtractor;
@@ -136,9 +139,20 @@ public class SpillableMapImpl<K, V> implements Spillable.SpillableMap<K, V>, Spi
     throw new UnsupportedOperationException();
   }
 
+  private long cacheCount = 0;
+  private long storeCount = 0;
+  private long nullCount = 0;
+  private static final transient Logger logger = LoggerFactory.getLogger(SpillableMapImpl.class);
   @Override
   public V get(Object o)
   {
+    if(cacheCount + storeCount + nullCount >= 1000000) {
+      logger.info("cacheCount: {}, nullCount: {}, storeCount: {}, cacheCount percentage: {}",
+          cacheCount, nullCount, storeCount, cacheCount * 100 / (cacheCount + storeCount + nullCount));
+      cacheCount = 0;
+      storeCount = 0;
+      nullCount = 0;
+    }
     K key = (K)o;
 
     if (cache.getRemovedKeys().contains(key)) {
@@ -148,17 +162,24 @@ public class SpillableMapImpl<K, V> implements Spillable.SpillableMap<K, V>, Spi
     V val = cache.get(key);
 
     if (val != null) {
+      ++cacheCount;
       return val;
     }
 
     Slice valSlice = store.getSync(getBucket(key), keyValueSerdeManager.serializeDataKey(key, false));
 
     if (valSlice == null || valSlice == BucketedState.EXPIRED || valSlice.length == 0) {
+      ++nullCount;
       return null;
     }
 
+    ++storeCount;
     tmpInput.setBuffer(valSlice.buffer, valSlice.offset, valSlice.length);
-    return keyValueSerdeManager.deserializeValue(tmpInput);
+    V value = keyValueSerdeManager.deserializeValue(tmpInput);
+
+    //cache it
+    cache.put(key, value);
+    return value;
   }
 
 
@@ -234,9 +255,17 @@ public class SpillableMapImpl<K, V> implements Spillable.SpillableMap<K, V>, Spi
   {
   }
 
+  private long changedKeys = 0;
+  private long removedKeys = 0;
+  private long endWindowCost = 0;
+  private int windows = 0;
   @Override
   public void endWindow()
   {
+    long startTime = System.currentTimeMillis();
+    changedKeys += cache.getChangedKeys().size();
+    removedKeys += cache.getRemovedKeys().size();
+
     for (K key: cache.getChangedKeys()) {
       //the getBucket() returned in fact is time, the bucket assign then assigned the bucketId
       long timeOrBucketId = getBucket(key);
@@ -260,6 +289,15 @@ public class SpillableMapImpl<K, V> implements Spillable.SpillableMap<K, V>, Spi
     }
     cache.endWindow();
     keyValueSerdeManager.resetReadBuffer();
+
+    endWindowCost += System.currentTimeMillis() - startTime;
+    if (++windows == 20) {
+      logger.info("==== Instance: {}, endWindow cost: {}; changedKeys: {}, removedKeys: {}", System.identityHashCode(this), endWindowCost, changedKeys, removedKeys);
+      windows = 0;
+      endWindowCost = 0;
+      changedKeys = 0;
+      removedKeys = 0;
+    }
   }
 
   @Override

@@ -28,7 +28,7 @@ public abstract class AbstractGenerator extends BaseOperator implements InputOpe
 {
   protected int emitBatchSize = 1000;
   protected byte[] val = ByteBuffer.allocate(1000).putLong(1234).array();
-  protected int rate = 200000;
+  protected int rate = 20000;
   protected int emitCount = 0;
   protected final Random random = new Random();
   protected int range = 1000 * 60; // one minute range of hot keys
