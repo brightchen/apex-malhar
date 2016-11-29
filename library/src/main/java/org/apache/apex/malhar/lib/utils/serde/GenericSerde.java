@@ -21,6 +21,7 @@ package org.apache.apex.malhar.lib.utils.serde;
 import java.util.Map;
 
 import org.apache.apex.malhar.lib.window.Window;
+import org.apache.commons.lang3.mutable.MutableLong;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.classification.InterfaceStability;
 
@@ -43,7 +44,15 @@ public class GenericSerde<T> implements Serde<T>
    * The default GenericSerde use the default class to serde map
    */
   public static final GenericSerde DEFAULT = new GenericSerde();
-  private Kryo kryo = new Kryo();
+
+  private transient ThreadLocal<Kryo> kryos = new ThreadLocal<Kryo>()
+  {
+    @Override
+    public Kryo get()
+    {
+      return new Kryo();
+    }
+  };
 
   private Class<? extends T> clazz;
 
@@ -63,6 +72,7 @@ public class GenericSerde<T> implements Serde<T>
     registerSerde(Integer.class, new IntSerde());
     registerSerde(ImmutablePair.class, new ImmutablePairSerde());
     registerSerde(Window.TimeWindow.class, new TimeWindowSerde());
+    registerSerde(MutableLong.class, new MutableLongSerde());
   }
 
   public GenericSerde()
@@ -95,9 +105,9 @@ public class GenericSerde<T> implements Serde<T>
     }
 
     if (clazz == null) {
-      kryo.writeClassAndObject(output, object);
+      kryos.get().writeClassAndObject(output, object);
     } else {
-      kryo.writeObject(output, object);
+      kryos.get().writeObject(output, object);
     }
   }
 
@@ -111,9 +121,9 @@ public class GenericSerde<T> implements Serde<T>
 
     T object;
     if (clazz == null) {
-      object = (T)kryo.readClassAndObject(input);
+      object = (T)kryos.get().readClassAndObject(input);
     } else {
-      object = kryo.readObject(input, clazz);
+      object = kryos.get().readObject(input, clazz);
     }
     return object;
   }
