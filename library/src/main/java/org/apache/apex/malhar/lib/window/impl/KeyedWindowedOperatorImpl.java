@@ -50,6 +50,7 @@ import com.datatorrent.lib.util.KeyValPair;
 public class KeyedWindowedOperatorImpl<KeyT, InputValT, AccumT, OutputValT>
     extends AbstractWindowedOperator<KeyValPair<KeyT, InputValT>, KeyValPair<KeyT, OutputValT>, WindowedStorage.WindowedKeyedStorage<KeyT, AccumT>, WindowedStorage.WindowedKeyedStorage<KeyT, OutputValT>, Accumulation<InputValT, AccumT, OutputValT>>
 {
+  protected WindowedStorage.WindowedKeyedStorage<KeyT, AccumT> updatedDataStorage;
 
   @Override
   protected <T> Collection<Window.SessionWindow> assignSessionWindows(long timestamp, Tuple<T> inputTuple)
@@ -145,21 +146,41 @@ public class KeyedWindowedOperatorImpl<KeyT, InputValT, AccumT, OutputValT>
       if (accum == null) {
         accum = accumulation.defaultAccumulatedValue();
       }
-      dataStorage.put(window, key, accumulation.accumulate(accum, kvData.getValue()));
+
+      InputValT inputValue = kvData.getValue();
+      AccumT newValue = accumulation.accumulate(accum, inputValue);
+      if (earlyTriggerMillis > 0 || lateTriggerMillis > 0) {
+        updatedDataStorage.put(window, key, newValue);
+      }
+
+      dataStorage.put(window, key, newValue);
     }
   }
+
 
   @Override
   public void fireNormalTrigger(Window window, boolean fireOnlyUpdatedPanes)
   {
-    for (Map.Entry<KeyT, AccumT> entry : dataStorage.entries(window)) {
-      OutputValT outputVal = accumulation.getOutput(entry.getValue());
-      if (fireOnlyUpdatedPanes && retractionStorage != null) {
-        OutputValT oldValue = retractionStorage.get(window, entry.getKey());
-        if (oldValue != null && oldValue.equals(outputVal)) {
-          continue;
+    if (fireOnlyUpdatedPanes) {
+      for (Map.Entry<KeyT, AccumT> entry : updatedDataStorage.entries(window)) {
+        OutputValT outputVal = accumulation.getOutput(entry.getValue());
+        if (retractionStorage != null) {
+          OutputValT oldValue = retractionStorage.get(window, entry.getKey());
+          if (oldValue != null && oldValue.equals(outputVal)) {
+            continue;
+          }
+        }
+        output.emit(new Tuple.WindowedTuple<>(window, new KeyValPair<>(entry.getKey(), outputVal)));
+        if (retractionStorage != null) {
+          retractionStorage.put(window, entry.getKey(), outputVal);
         }
       }
+      return;
+    }
+
+    for (Map.Entry<KeyT, AccumT> entry : dataStorage.entries(window)) {
+      OutputValT outputVal = accumulation.getOutput(entry.getValue());
+
       output.emit(new Tuple.WindowedTuple<>(window, new KeyValPair<>(entry.getKey(), outputVal)));
       if (retractionStorage != null) {
         retractionStorage.put(window, entry.getKey(), outputVal);
