@@ -146,13 +146,6 @@ public class SpillableMapImpl<K, V> implements Spillable.SpillableMap<K, V>, Spi
   @Override
   public V get(Object o)
   {
-    if(cacheCount + storeCount + nullCount >= 1000000) {
-      logger.info("cacheCount: {}, nullCount: {}, storeCount: {}, cacheCount percentage: {}",
-          cacheCount, nullCount, storeCount, cacheCount * 100 / (cacheCount + storeCount + nullCount));
-      cacheCount = 0;
-      storeCount = 0;
-      nullCount = 0;
-    }
     K key = (K)o;
 
     if (cache.getRemovedKeys().contains(key)) {
@@ -292,11 +285,18 @@ public class SpillableMapImpl<K, V> implements Spillable.SpillableMap<K, V>, Spi
 
     endWindowCost += System.currentTimeMillis() - startTime;
     if (++windows == 20) {
-      logger.info("==== Instance: {}, endWindow cost: {}; changedKeys: {}, removedKeys: {}", System.identityHashCode(this), endWindowCost, changedKeys, removedKeys);
+      logger.info("==== Instance: {}, endWindow cost: {}; changedKeys: {}, removedKeys: {}, cacheCount: {}, nullCount: {}, storeCount: {},",
+          System.identityHashCode(this), endWindowCost, changedKeys, removedKeys, cacheCount, nullCount, storeCount);
+
       windows = 0;
       endWindowCost = 0;
       changedKeys = 0;
       removedKeys = 0;
+
+      cacheCount = 0;
+      storeCount = 0;
+      nullCount = 0;
+
     }
   }
 

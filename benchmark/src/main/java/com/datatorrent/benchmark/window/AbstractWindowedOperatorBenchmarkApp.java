@@ -111,7 +111,7 @@ public abstract class AbstractWindowedOperatorBenchmarkApp<G extends Operator, O
       windowedOperator.setAllowedLateness(Duration.millis(ALLOWED_LATENESS));
       windowedOperator.setWindowOption(new WindowOption.TimeWindows(Duration.standardMinutes(1)));
       //accumulating mode
-      windowedOperator.setTriggerOption(TriggerOption.AtWatermark().withEarlyFiringsAtEvery(Duration.standardSeconds(1)).accumulatingFiredPanes());
+      windowedOperator.setTriggerOption(TriggerOption.AtWatermark().withEarlyFiringsAtEvery(Duration.standardSeconds(1)).accumulatingFiredPanes().firingOnlyUpdatedPanes());
       windowedOperator.setFixedWatermark(30000);
       //windowedOperator.setTriggerOption(TriggerOption.AtWatermark());
 
