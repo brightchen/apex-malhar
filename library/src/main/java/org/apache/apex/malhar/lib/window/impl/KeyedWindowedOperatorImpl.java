@@ -33,6 +33,7 @@ import org.apache.apex.malhar.lib.window.WindowState;
 import org.apache.apex.malhar.lib.window.WindowedStorage;
 import org.apache.hadoop.classification.InterfaceStability;
 
+import com.datatorrent.api.Context;
 import com.datatorrent.lib.util.KeyValPair;
 
 /**
@@ -50,7 +51,14 @@ import com.datatorrent.lib.util.KeyValPair;
 public class KeyedWindowedOperatorImpl<KeyT, InputValT, AccumT, OutputValT>
     extends AbstractWindowedOperator<KeyValPair<KeyT, InputValT>, KeyValPair<KeyT, OutputValT>, WindowedStorage.WindowedKeyedStorage<KeyT, AccumT>, WindowedStorage.WindowedKeyedStorage<KeyT, OutputValT>, Accumulation<InputValT, AccumT, OutputValT>>
 {
-  protected WindowedStorage.WindowedKeyedStorage<KeyT, AccumT> updatedDataStorage;
+  private WindowedStorage.WindowedKeyedStorage<KeyT, AccumT> updatedDataStorage;
+
+  @Override
+  public void setup(Context.OperatorContext context)
+  {
+    updatedDataStorage.setup(context);
+    super.setup(context);
+  }
 
   @Override
   protected <T> Collection<Window.SessionWindow> assignSessionWindows(long timestamp, Tuple<T> inputTuple)
@@ -175,6 +183,7 @@ public class KeyedWindowedOperatorImpl<KeyT, InputValT, AccumT, OutputValT>
           retractionStorage.put(window, entry.getKey(), outputVal);
         }
       }
+      updatedDataStorage.remove(window);
       return;
     }
 
@@ -206,6 +215,16 @@ public class KeyedWindowedOperatorImpl<KeyT, InputValT, AccumT, OutputValT>
       }
       output.emit(new Tuple.WindowedTuple<>(window, new KeyValPair<>(entry.getKey(), accumulation.getRetraction(entry.getValue()))));
     }
+  }
+
+  public WindowedStorage.WindowedKeyedStorage<KeyT, AccumT> getUpdatedDataStorage()
+  {
+    return updatedDataStorage;
+  }
+
+  public void setUpdatedDataStorage(WindowedStorage.WindowedKeyedStorage<KeyT, AccumT> updatedDataStorage)
+  {
+    this.updatedDataStorage = updatedDataStorage;
   }
 
 }

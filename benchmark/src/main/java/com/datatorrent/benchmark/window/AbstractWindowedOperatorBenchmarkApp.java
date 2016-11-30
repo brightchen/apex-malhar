@@ -106,12 +106,13 @@ public abstract class AbstractWindowedOperatorBenchmarkApp<G extends Operator, O
       windowedOperator.setDataStorage(createDataStorage(sccImpl));
       windowedOperator.setRetractionStorage(createRetractionStorage(sccImpl));
       windowedOperator.setWindowStateStorage(new InMemoryWindowedStorage());
+      setOtherStorage(windowedOperator, sccImpl);
       windowedOperator.setAccumulation(createAccumulation());
 
       windowedOperator.setAllowedLateness(Duration.millis(ALLOWED_LATENESS));
       windowedOperator.setWindowOption(new WindowOption.TimeWindows(Duration.standardMinutes(1)));
       //accumulating mode
-      windowedOperator.setTriggerOption(TriggerOption.AtWatermark().withEarlyFiringsAtEvery(Duration.standardSeconds(1)).accumulatingFiredPanes());
+      windowedOperator.setTriggerOption(TriggerOption.AtWatermark().withEarlyFiringsAtEvery(Duration.standardSeconds(1)).accumulatingFiredPanes().firingOnlyUpdatedPanes());
       windowedOperator.setFixedWatermark(30000);
       //windowedOperator.setTriggerOption(TriggerOption.AtWatermark());
 
@@ -119,6 +120,10 @@ public abstract class AbstractWindowedOperatorBenchmarkApp<G extends Operator, O
     } catch (Exception e) {
       throw Throwables.propagate(e);
     }
+  }
+
+  protected void setOtherStorage(O windowedOperator, SpillableComplexComponentImpl sccImpl)
+  {
   }
 
   protected abstract WindowedStorage createDataStorage(SpillableComplexComponentImpl sccImpl);

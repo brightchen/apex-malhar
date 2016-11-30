@@ -51,6 +51,13 @@ public class KeyedWindowedOperatorBenchmarkApp extends AbstractWindowedOperatorB
     dag.addStream("Data", generator.data, windowedOperator.input).setLocality(Locality.CONTAINER_LOCAL);
   }
 
+  @Override
+  protected void setOtherStorage(MyKeyedWindowedOperator windowedOperator, SpillableComplexComponentImpl sccImpl)
+  {
+    windowedOperator.setUpdatedDataStorage(createUpdatedDataStorage(sccImpl));
+  }
+
+
   protected static class MyKeyedWindowedOperator extends KeyedWindowedOperatorImpl
   {
     private static final Logger logger = LoggerFactory.getLogger(MyKeyedWindowedOperator.class);
@@ -117,9 +124,18 @@ public class KeyedWindowedOperatorBenchmarkApp extends AbstractWindowedOperatorB
   }
 
   private boolean useInMemoryStorage = false;
-
   @Override
   protected WindowedStorage createDataStorage(SpillableComplexComponentImpl sccImpl)
+  {
+    if (useInMemoryStorage) {
+      return new InMemoryWindowedKeyedStorage();
+    }
+    SpillableWindowedKeyedStorage dataStorage = new SpillableWindowedKeyedStorage();
+    dataStorage.setSpillableComplexComponent(sccImpl);
+    return dataStorage;
+  }
+
+  protected WindowedStorage.WindowedKeyedStorage createUpdatedDataStorage(SpillableComplexComponentImpl sccImpl)
   {
     if (useInMemoryStorage) {
       return new InMemoryWindowedKeyedStorage();
