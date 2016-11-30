@@ -186,6 +186,9 @@ public class SpillableSetImpl<T> implements Spillable.SpillableSet<T>, Spillable
       {
         while (cur != null) {
           ListNode<T> node = map.get(cur);
+          if(node == null){
+            return false;
+          }
           if (node.valid) {
             return true;
           }

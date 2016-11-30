@@ -22,17 +22,25 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.apex.malhar.lib.state.spillable.SpillableComplexComponentImpl;
+import org.apache.apex.malhar.lib.state.spillable.SpillableSetMultimapImpl;
+import org.apache.apex.malhar.lib.state.spillable.managed.ManagedStateSpillableStateStore;
+import org.apache.apex.malhar.lib.utils.serde.GenericSerde;
 import org.apache.apex.malhar.lib.window.Accumulation;
 import org.apache.apex.malhar.lib.window.Tuple;
+import org.apache.apex.malhar.lib.window.Window;
 import org.apache.apex.malhar.lib.window.WindowedStorage;
 import org.apache.apex.malhar.lib.window.accumulation.Count;
 import org.apache.apex.malhar.lib.window.impl.InMemoryWindowedKeyedStorage;
 import org.apache.apex.malhar.lib.window.impl.KeyedWindowedOperatorImpl;
 import org.apache.apex.malhar.lib.window.impl.SpillableWindowedKeyedStorage;
+import org.apache.hadoop.conf.Configuration;
 
 import com.datatorrent.api.DAG;
 import com.datatorrent.api.DAG.Locality;
 import com.datatorrent.api.DefaultOutputPort;
+import com.datatorrent.benchmark.window.KeyedWindowedOperatorBenchmarkApp.KeyedWindowedGenerator;
+import com.datatorrent.benchmark.window.KeyedWindowedOperatorBenchmarkApp.MyKeyedWindowedOperator;
+import com.datatorrent.lib.fileaccess.TFileImpl;
 import com.datatorrent.lib.util.KeyValPair;
 
 public class KeyedWindowedOperatorBenchmarkApp extends AbstractWindowedOperatorBenchmarkApp<KeyedWindowedOperatorBenchmarkApp.KeyedWindowedGenerator, KeyedWindowedOperatorBenchmarkApp.MyKeyedWindowedOperator>
@@ -52,9 +60,9 @@ public class KeyedWindowedOperatorBenchmarkApp extends AbstractWindowedOperatorB
   }
 
   @Override
-  protected void setOtherStorage(MyKeyedWindowedOperator windowedOperator, SpillableComplexComponentImpl sccImpl)
+  protected void setOtherStorage(MyKeyedWindowedOperator windowedOperator, Configuration conf, SpillableComplexComponentImpl sccImpl)
   {
-    windowedOperator.setUpdatedDataStorage(createUpdatedDataStorage(sccImpl));
+    windowedOperator.setUpdatedDataStorage(createUpdatedDataStorage(conf, sccImpl));
   }
 
 
@@ -87,6 +95,8 @@ public class KeyedWindowedOperatorBenchmarkApp extends AbstractWindowedOperatorB
         logger.info("total: count: {}; time: {}; average: {}; period: count: {}; dropped: {}; time: {}; average: {}",
             totalCount, endTime - totalBeginTime, totalCount * 1000 / (endTime - totalBeginTime),
             tupleCount, droppedCount, endTime - beginTime, tupleCount * 1000 / (endTime - beginTime));
+        logger.info("entries: {}", entries);
+        entries = 0;
         windowCount = 0;
         beginTime = System.currentTimeMillis();
         tupleCount = 0;
@@ -135,13 +145,15 @@ public class KeyedWindowedOperatorBenchmarkApp extends AbstractWindowedOperatorB
     return dataStorage;
   }
 
-  protected WindowedStorage.WindowedKeyedStorage createUpdatedDataStorage(SpillableComplexComponentImpl sccImpl)
+  protected SpillableSetMultimapImpl<Window, String> createUpdatedDataStorage(Configuration conf, SpillableComplexComponentImpl sccImpl)
   {
-    if (useInMemoryStorage) {
-      return new InMemoryWindowedKeyedStorage();
-    }
-    SpillableWindowedKeyedStorage dataStorage = new SpillableWindowedKeyedStorage();
-    dataStorage.setSpillableComplexComponent(sccImpl);
+    String basePath = getStoreBasePath(conf);
+    ManagedStateSpillableStateStore store = new ManagedStateSpillableStateStore();
+    ((TFileImpl.DTFileImpl)store.getFileAccess()).setBasePath(basePath);
+
+    SpillableSetMultimapImpl<Window, String> dataStorage = new SpillableSetMultimapImpl<>(store, new byte[]{(byte)1}, 0,
+        new GenericSerde<Window>(),
+        new GenericSerde<String>());
     return dataStorage;
   }
 
