@@ -141,4 +141,10 @@ public class SpillableWindowedPlainStorage<T> implements WindowedStorage.Windowe
   public void teardown()
   {
   }
+
+  @Override
+  public void completed(Window window)
+  {
+    remove(window);
+  }
 }

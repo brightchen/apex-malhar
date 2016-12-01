@@ -56,6 +56,15 @@ public interface WindowedStorage extends Component<Context.OperatorContext>
   void remove(Window window);
 
   /**
+   * The window is completed
+   * No other operation will apply to this window any more after called this method.
+   *
+   * @param window the window
+   */
+  void completed(Window window);
+
+
+  /**
    * This interface handles plain value per window. If there is a key/value map for each window, use
    * {@link WindowedKeyedStorage}. Also note that a single T object is assumed to be fit in memory
    *
@@ -122,6 +131,5 @@ public interface WindowedStorage extends Component<Context.OperatorContext>
      * @return the value
      */
     V get(Window window, K key);
-
   }
 }

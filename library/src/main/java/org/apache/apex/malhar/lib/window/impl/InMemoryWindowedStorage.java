@@ -86,4 +86,9 @@ public class InMemoryWindowedStorage<T> implements WindowedStorage.WindowedPlain
   {
   }
 
+  @Override
+  public void completed(Window window)
+  {
+    remove(window);
+  }
 }
