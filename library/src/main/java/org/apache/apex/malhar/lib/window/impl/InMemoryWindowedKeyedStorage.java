@@ -49,6 +49,7 @@ public class InMemoryWindowedKeyedStorage<K, V> extends InMemoryWindowedStorage<
     kvMap.put(key, value);
   }
 
+  @Override
   public Iterable<Map.Entry<K, V>> entries(Window window)
   {
     if (map.containsKey(window)) {
@@ -68,4 +69,9 @@ public class InMemoryWindowedKeyedStorage<K, V> extends InMemoryWindowedStorage<
     }
   }
 
+  @Override
+  public void completed(Window window)
+  {
+    remove(window);
+  }
 }

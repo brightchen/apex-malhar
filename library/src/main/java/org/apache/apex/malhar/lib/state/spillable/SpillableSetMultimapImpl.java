@@ -258,7 +258,7 @@ public class SpillableSetMultimapImpl<K, V> implements Spillable.SpillableSetMul
     if (cache.contains((K)key)) {
       return true;
     }
-    Pair<Integer, V> meta = map.get((K)key);
+    Pair<Integer, V> meta = map.get(key);
     return meta != null && meta.getLeft() > 0;
   }
 
@@ -372,6 +372,7 @@ public class SpillableSetMultimapImpl<K, V> implements Spillable.SpillableSetMul
     for (SpillableSetImpl removedSet : removedSets) {
       removedSet.endWindow();
     }
+    removedSets.clear();
 
     cache.endWindow();
     map.endWindow();

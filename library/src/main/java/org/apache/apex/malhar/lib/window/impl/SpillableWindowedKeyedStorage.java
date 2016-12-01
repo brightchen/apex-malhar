@@ -219,4 +219,19 @@ public class SpillableWindowedKeyedStorage<K, V> implements WindowedStorage.Wind
   {
     return windowKeyToValueMap.get(new ImmutablePair<>(window, key));
   }
+
+  @Override
+  public void completed(Window window)
+  {
+    //TODO: it's better to remove the memory leftover of this window from windowKeyToValueMap
+//    Set<K> keys = windowToKeysMap.get(window);
+//    if (keys != null) {
+//      for (K key : keys) {
+//        //windowKeyToValueMap.removeFromMemory(new ImmutablePair<>(window, key));
+//      }
+//    }
+    windowToKeysMap.removeAll(window);
+
+
+  }
 }

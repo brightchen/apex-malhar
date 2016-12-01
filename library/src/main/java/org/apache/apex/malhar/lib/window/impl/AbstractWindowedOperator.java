@@ -510,7 +510,7 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
           if (allowedLatenessMillis >= 0 && window.getBeginTimestamp() + window.getDurationMillis() < horizon) {
             // discard this window because it's too late now
             it.remove();
-            dataStorage.remove(window);
+            dataStorage.completed(window);
             if (retractionStorage != null) {
               retractionStorage.remove(window);
             }
