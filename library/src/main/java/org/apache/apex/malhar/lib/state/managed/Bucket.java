@@ -41,6 +41,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.google.common.hash.BloomFilter;
+import com.google.common.hash.Funnel;
+import com.google.common.hash.PrimitiveSink;
 import com.google.common.primitives.Longs;
 
 import com.datatorrent.lib.fileaccess.FileAccess;
@@ -232,6 +235,9 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
 
     protected ConcurrentLinkedQueue<Long> windowsForFreeMemory = new ConcurrentLinkedQueue<>();
 
+    private BloomFilter<Slice> bloomFilter = null;
+    private int numOfInsertion = 10000000;
+
     private DefaultBucket()
     {
       //for kryo
@@ -247,6 +253,7 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
     public void setup(@NotNull ManagedStateContext managedStateContext)
     {
       this.managedStateContext = Preconditions.checkNotNull(managedStateContext, "managed state context");
+      bloomFilter = BloomFilter.create(SliceFunnel.INSTANCE, numOfInsertion, 0.1);
     }
 
     @Override
@@ -337,6 +344,10 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
     {
       // This call is lightweight
       releaseMemory();
+      if (!bloomFilter.mightContain(key)) {
+        return null;
+      }
+
       key = SliceUtils.toBufferSlice(key);
       switch (readSource) {
         case MEMORY:
@@ -409,6 +420,8 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
     @Override
     public void put(Slice key, long timeBucket, Slice value)
     {
+      bloomFilter.put(key);
+
       // This call is lightweight
       releaseMemory();
       key = SliceUtils.toBufferSlice(key);
@@ -630,6 +643,18 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
       return valueStream;
     }
 
+    public static class SliceFunnel implements Funnel<Slice>
+    {
+      public static SliceFunnel INSTANCE = new SliceFunnel();
+
+      @Override
+      public void funnel(Slice from, PrimitiveSink into)
+      {
+        into.putBytes(from.buffer, from.offset, from.length);
+      }
+    }
+
     private static final Logger LOG = LoggerFactory.getLogger(DefaultBucket.class);
+
   }
 }
