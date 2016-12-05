@@ -79,7 +79,7 @@ public class SerdePerformanceTest
   public void testCompareSerdeForRealCase()
   {
     long beginTime = System.currentTimeMillis();
-    GenericSerde<ImmutablePair> serde = new GenericSerde<>();
+    GenericSerde<ImmutablePair> serde = new GenericSerde<ImmutablePair>();
     for(int i=0; i<serdeDataSize; ++i) {
       serde.serialize(generatePair(beginTime), buffer);
       buffer.toSlice();
@@ -113,6 +113,6 @@ public class SerdePerformanceTest
 
   protected ImmutablePair generatePair(long now)
   {
-    return new ImmutablePair(new Window.TimeWindow<>(now + random.nextInt(100), random.nextInt(100)), "" + random.nextInt(1000));
+    return new ImmutablePair(new Window.TimeWindow(now + random.nextInt(100), random.nextInt(100)), "" + random.nextInt(1000));
   }
 }

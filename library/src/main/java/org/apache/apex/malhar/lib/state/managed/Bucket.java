@@ -36,14 +36,14 @@ import org.slf4j.LoggerFactory;
 import org.apache.apex.malhar.lib.utils.serde.KeyValueByteStreamProvider;
 import org.apache.apex.malhar.lib.utils.serde.SliceUtils;
 import org.apache.apex.malhar.lib.utils.serde.WindowedBlockStream;
+import org.apache.hadoop.util.bloom.BloomFilter;
+import org.apache.hadoop.util.bloom.Key;
+import org.apache.hadoop.util.hash.Hash;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.google.common.hash.BloomFilter;
-import com.google.common.hash.Funnel;
-import com.google.common.hash.PrimitiveSink;
 import com.google.common.primitives.Longs;
 
 import com.datatorrent.lib.fileaccess.FileAccess;
@@ -235,7 +235,7 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
 
     protected ConcurrentLinkedQueue<Long> windowsForFreeMemory = new ConcurrentLinkedQueue<>();
 
-    private BloomFilter<Slice> bloomFilter = null;
+    private BloomFilter bloomFilter = null;
     private int numOfInsertion = 10000000;
 
     private DefaultBucket()
@@ -253,7 +253,7 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
     public void setup(@NotNull ManagedStateContext managedStateContext)
     {
       this.managedStateContext = Preconditions.checkNotNull(managedStateContext, "managed state context");
-      bloomFilter = BloomFilter.create(SliceFunnel.INSTANCE, numOfInsertion, 0.1);
+      bloomFilter = new BloomFilter(numOfInsertion, 3, Hash.MURMUR_HASH);//BloomFilter.create(SliceFunnel.INSTANCE, numOfInsertion, 0.1);
     }
 
     @Override
@@ -344,7 +344,7 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
     {
       // This call is lightweight
       releaseMemory();
-      if (!bloomFilter.mightContain(key)) {
+      if (!bloomFilter.membershipTest(new Key(key.toByteArray()))) {
         return null;
       }
 
@@ -420,7 +420,7 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
     @Override
     public void put(Slice key, long timeBucket, Slice value)
     {
-      bloomFilter.put(key);
+      bloomFilter.add(new Key(key.toByteArray()));
 
       // This call is lightweight
       releaseMemory();
@@ -643,16 +643,22 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
       return valueStream;
     }
 
-    public static class SliceFunnel implements Funnel<Slice>
-    {
-      public static SliceFunnel INSTANCE = new SliceFunnel();
-
-      @Override
-      public void funnel(Slice from, PrimitiveSink into)
-      {
-        into.putBytes(from.buffer, from.offset, from.length);
-      }
-    }
+//    public static class SliceFunnel implements Funnel<Slice>
+//    {
+//      public static SliceFunnel INSTANCE = new SliceFunnel();
+//
+//      @Override
+//      public void funnel(Slice from, Sink into)
+//      {
+//        into.putBytes(from.buffer, from.offset, from.length);
+//      }
+//
+//      @Override
+//      public void funnel(Slice from, PrimitiveSink into)
+//      {
+//        into.putBytes(from.buffer, from.offset, from.length);
+//      }
+//    }
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultBucket.class);
 

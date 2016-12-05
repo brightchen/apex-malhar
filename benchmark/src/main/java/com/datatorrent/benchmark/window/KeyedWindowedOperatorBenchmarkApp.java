@@ -38,8 +38,6 @@ import org.apache.hadoop.conf.Configuration;
 import com.datatorrent.api.DAG;
 import com.datatorrent.api.DAG.Locality;
 import com.datatorrent.api.DefaultOutputPort;
-import com.datatorrent.benchmark.window.KeyedWindowedOperatorBenchmarkApp.KeyedWindowedGenerator;
-import com.datatorrent.benchmark.window.KeyedWindowedOperatorBenchmarkApp.MyKeyedWindowedOperator;
 import com.datatorrent.lib.fileaccess.TFileImpl;
 import com.datatorrent.lib.util.KeyValPair;
 
@@ -151,7 +149,7 @@ public class KeyedWindowedOperatorBenchmarkApp extends AbstractWindowedOperatorB
     ManagedStateSpillableStateStore store = new ManagedStateSpillableStateStore();
     ((TFileImpl.DTFileImpl)store.getFileAccess()).setBasePath(basePath);
 
-    SpillableSetMultimapImpl<Window, String> dataStorage = new SpillableSetMultimapImpl<>(store, new byte[]{(byte)1}, 0,
+    SpillableSetMultimapImpl<Window, String> dataStorage = new SpillableSetMultimapImpl<Window, String>(store, new byte[]{(byte)1}, 0,
         new GenericSerde<Window>(),
         new GenericSerde<String>());
     return dataStorage;
