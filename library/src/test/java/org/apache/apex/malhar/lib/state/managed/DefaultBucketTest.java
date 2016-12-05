@@ -28,6 +28,7 @@ import org.junit.Test;
 import org.junit.rules.TestWatcher;
 import org.junit.runner.Description;
 
+import org.apache.apex.malhar.lib.state.managed.Bucket.DefaultBucket;
 import org.apache.apex.malhar.lib.state.managed.Bucket.ReadSource;
 import org.apache.apex.malhar.lib.utils.serde.AffixSerde;
 import org.apache.apex.malhar.lib.utils.serde.SerializationBuffer;
@@ -52,6 +53,9 @@ public class DefaultBucketTest
     @Override
     protected void starting(Description description)
     {
+      //lots of test case get around the normal workflow and directly write to file. So should disable bloom filter
+      DefaultBucket.setDisableBloomFilterByDefault(true);
+
       TestUtils.deleteTargetTestClassFolder(description);
       managedStateContext = new MockManagedStateContext(ManagedStateTestUtils.getOperatorContext(9));
       applicationPath = "target/" + description.getClassName() + "/" + description.getMethodName();

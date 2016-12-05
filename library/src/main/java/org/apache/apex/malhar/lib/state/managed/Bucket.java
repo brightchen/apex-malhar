@@ -232,6 +232,12 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
 
     protected ConcurrentLinkedQueue<Long> windowsForFreeMemory = new ConcurrentLinkedQueue<>();
 
+    private static boolean disableBloomFilterByDefault = false;
+    private boolean disableBloomFilter = disableBloomFilterByDefault;
+    private static int bloomFilterDefaultBitSize = 1000000;
+    private SliceBloomFilter bloomFilter = null;
+    private int bloomFilterBitSize = bloomFilterDefaultBitSize;
+
     private DefaultBucket()
     {
       //for kryo
@@ -247,6 +253,9 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
     public void setup(@NotNull ManagedStateContext managedStateContext)
     {
       this.managedStateContext = Preconditions.checkNotNull(managedStateContext, "managed state context");
+      if (!disableBloomFilter && bloomFilter == null) {
+        bloomFilter = new SliceBloomFilter(bloomFilterBitSize, 0.99);
+      }
     }
 
     @Override
@@ -302,7 +311,7 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
         if (timeBucket != -1) {
           BucketedValue bucketedValue = getValueFromTimeBucketReader(key, timeBucket);
           if (bucketedValue != null) {
-            if (timeBucket == cachedBucketMetas.firstKey()) {
+            if (!cachedBucketMetas.isEmpty() && timeBucket == cachedBucketMetas.firstKey()) {
               //if the requested time bucket is the latest time bucket on file, the key/value is put in the file cache.
               //Since the size of the whole time-bucket is added to total size, there is no need to add the size of
               //entries in file cache.
@@ -353,6 +362,41 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
       }
     }
 
+
+    private int filtedCount = 0;
+    private int unfiltedCount = 0;
+    private long verifyBloomFilterBeginTime = 0;
+    private long verifyBloomFilterInterval = 5000;
+    /**
+     * Test the result of using bloom filter and remove it if it not helpful for improving the performance.
+     *
+     * @param mightContain true if collection might contain the value
+     */
+    private void verifyBloomFilter(boolean mightContain)
+    {
+      if (!mightContain) {
+        filtedCount++;
+      } else {
+        unfiltedCount++;
+      }
+      long now = System.currentTimeMillis();
+      if (verifyBloomFilterBeginTime == 0) {
+        verifyBloomFilterBeginTime = now;
+      } else if (now - verifyBloomFilterBeginTime > verifyBloomFilterInterval) {
+        if (unfiltedCount > filtedCount * 4) {
+          unloadBloomFilter();
+        } else {
+          filtedCount = unfiltedCount = 0;
+          verifyBloomFilterBeginTime = now;
+        }
+      }
+    }
+
+    private void unloadBloomFilter()
+    {
+      bloomFilter = null;
+    }
+
     /**
      * Returns the value for the key from a time-bucket reader
      * @param key        key
@@ -361,6 +405,16 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
      */
     private BucketedValue getValueFromTimeBucketReader(Slice key, long timeBucket)
     {
+      if (bloomFilter != null) {
+        boolean mightContain = bloomFilter.mightContain(key);
+
+        verifyBloomFilter(mightContain);
+
+        if (!mightContain) {
+          return null;
+        }
+      }
+
       FileAccess.FileReader fileReader = readers.get(timeBucket);
       if (fileReader != null) {
         return readValue(fileReader, key, timeBucket);
@@ -411,6 +465,7 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
     {
       // This call is lightweight
       releaseMemory();
+
       key = SliceUtils.toBufferSlice(key);
       value = SliceUtils.toBufferSlice(value);
 
@@ -442,6 +497,16 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
     @Override
     public long freeMemory(long windowId) throws IOException
     {
+      /**
+       * The data still in memory and reachable before the memory released
+       * So put key into bloom filter here
+       */
+      if (bloomFilter != null) {
+        for (Slice key : flash.keySet()) {
+          bloomFilter.put(key);
+        }
+      }
+
       long memoryFreed = 0;
       Iterator<Map.Entry<Long, Map<Slice, BucketedValue>>> entryIter = committedData.entrySet().iterator();
       while (entryIter.hasNext()) {
@@ -493,9 +558,11 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
         memoryFreed += originSize - (keyStream.size() + valueStream.size());
       }
 
-      //release the free memory immediately
-      keyStream.releaseAllFreeMemory();
-      valueStream.releaseAllFreeMemory();
+      if (memoryFreed > 0) {
+        //release the free memory immediately
+        keyStream.releaseAllFreeMemory();
+        valueStream.releaseAllFreeMemory();
+      }
 
       return memoryFreed;
     }
@@ -504,6 +571,7 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
     public Map<Slice, BucketedValue> checkpoint(long windowId)
     {
       releaseMemory();
+
       try {
         //transferring the data from flash to check-pointed state in finally block and re-initializing the flash.
         return flash;
@@ -540,7 +608,9 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
               //so it will be re-written by BucketsDataManager
               try {
                 BucketsFileSystem.TimeBucketMeta tbm = cachedBucketMetas.get(bucketedValue.getTimeBucket());
-                memoryFreed += tbm.getSizeInBytes();
+                if (tbm != null) {
+                  memoryFreed += tbm.getSizeInBytes();
+                }
                 LOG.debug("closing reader {} {}", bucketId, bucketedValue.getTimeBucket());
                 reader.close();
               } catch (IOException e) {
@@ -626,6 +696,49 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
       return valueStream;
     }
 
+    public static int getBloomFilterDefaultBitSize()
+    {
+      return bloomFilterDefaultBitSize;
+    }
+
+    public static void setBloomFilterDefaultBitSize(int bloomFilterDefaultBitSize)
+    {
+      DefaultBucket.bloomFilterDefaultBitSize = bloomFilterDefaultBitSize;
+    }
+
+    public int getBloomFilterBitSize()
+    {
+      return bloomFilterBitSize;
+    }
+
+    public void setBloomFilterBitSize(int bloomFilterBitSize)
+    {
+      this.bloomFilterBitSize = bloomFilterBitSize;
+    }
+
+    public static boolean isDisableBloomFilterByDefault()
+    {
+      return disableBloomFilterByDefault;
+    }
+
+    public static void setDisableBloomFilterByDefault(boolean disableBloomFilterByDefault)
+    {
+      DefaultBucket.disableBloomFilterByDefault = disableBloomFilterByDefault;
+    }
+
+    public boolean isDisableBloomFilter()
+    {
+      return disableBloomFilter;
+    }
+
+    public void setDisableBloomFilter(boolean disableBloomFilter)
+    {
+      this.disableBloomFilter = disableBloomFilter;
+      this.unloadBloomFilter();
+    }
+
+
     private static final Logger LOG = LoggerFactory.getLogger(DefaultBucket.class);
+
   }
 }
