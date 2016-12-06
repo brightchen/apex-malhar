@@ -235,8 +235,10 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
 
     protected ConcurrentLinkedQueue<Long> windowsForFreeMemory = new ConcurrentLinkedQueue<>();
 
+    //TODO: serialize BloomFilter? neither java serializable nor kyro serializable
     private BloomFilter bloomFilter = null;
     private int numOfInsertion = 10000000;
+    private KeyMemManager keyMemManager = new KeyMemManager();
 
     private DefaultBucket()
     {
@@ -253,7 +255,9 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
     public void setup(@NotNull ManagedStateContext managedStateContext)
     {
       this.managedStateContext = Preconditions.checkNotNull(managedStateContext, "managed state context");
-      bloomFilter = new BloomFilter(numOfInsertion, 3, Hash.MURMUR_HASH);//BloomFilter.create(SliceFunnel.INSTANCE, numOfInsertion, 0.1);
+      if (bloomFilter == null) {
+        bloomFilter = new BloomFilter(numOfInsertion, 3, Hash.MURMUR_HASH);
+      }
     }
 
     @Override
@@ -344,7 +348,7 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
     {
       // This call is lightweight
       releaseMemory();
-      if (!bloomFilter.membershipTest(new Key(key.toByteArray()))) {
+      if (!bloomFilter.membershipTest(new Key(keyMemManager.toByteArray(key)))) {
         return null;
       }
 
@@ -420,7 +424,7 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
     @Override
     public void put(Slice key, long timeBucket, Slice value)
     {
-      bloomFilter.add(new Key(key.toByteArray()));
+      bloomFilter.add(new Key(keyMemManager.toByteArray(key)));
 
       // This call is lightweight
       releaseMemory();
@@ -643,22 +647,40 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
       return valueStream;
     }
 
-//    public static class SliceFunnel implements Funnel<Slice>
-//    {
-//      public static SliceFunnel INSTANCE = new SliceFunnel();
-//
-//      @Override
-//      public void funnel(Slice from, Sink into)
+    /**
+     * The key need to convert from slice to Byte[] in order to use Hadoop Bloom Filter
+     * which create a lot temporary byte arrays
+     * This class reused the allocated byte arrays.
+     * The assumption is that the length of the key will not vary very large.
+     */
+    private static class KeyMemManager
+    {
+      private transient Map<Integer, byte[]> lengthToArray = Maps.newHashMap();
+      private transient long totalSize;
+      private long maxSize = 1000000;
+
+//      public byte[] toByteArray(Slice slice)
 //      {
-//        into.putBytes(from.buffer, from.offset, from.length);
+//        return slice.toByteArray();
 //      }
-//
-//      @Override
-//      public void funnel(Slice from, PrimitiveSink into)
-//      {
-//        into.putBytes(from.buffer, from.offset, from.length);
-//      }
-//    }
+
+      public byte[] toByteArray(Slice slice)
+      {
+        if (totalSize > maxSize) {
+          lengthToArray.clear();
+          totalSize = 0;
+        }
+        byte[] array = lengthToArray.get(slice.length);
+        if (array == null) {
+          array = new byte[slice.length];
+          lengthToArray.put(slice.length, array);
+
+          totalSize += slice.length;
+        }
+        System.arraycopy(slice.buffer, slice.offset, array, 0, slice.length);
+        return array;
+      }
+    }
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultBucket.class);
 
