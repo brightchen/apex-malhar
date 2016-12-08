@@ -85,6 +85,8 @@ public class KeyedWindowedOperatorBenchmarkApp extends AbstractWindowedOperatorB
     @Override
     public void endWindow()
     {
+//      long windowBeginTime = System.currentTimeMillis();
+//      logger.info("endWindow start at: {}", windowBeginTime);
       super.endWindow();
       if (++windowCount == logWindows) {
         long endTime = System.currentTimeMillis();
@@ -100,6 +102,33 @@ public class KeyedWindowedOperatorBenchmarkApp extends AbstractWindowedOperatorB
         tupleCount = 0;
         droppedCount = 0;
       }
+//      long windowEndTime = System.currentTimeMillis();
+//      logger.info("endWindow end at: {}, cost: {}", windowEndTime, windowEndTime - windowBeginTime);
+    }
+
+    @Override
+    public void beforeCheckpoint(long windowId)
+    {
+      logger.info("beforeCheckpoint begin: {}", windowId);
+      super.beforeCheckpoint(windowId);
+      logger.info("beforeCheckpoint end: {}", windowId);
+    }
+
+    @Override
+    public void checkpointed(long windowId)
+    {
+      logger.info("checkpointed begin: {}", windowId);
+      super.checkpointed(windowId);
+      logger.info("checkpointed end: {}", windowId);
+    }
+
+    @Override
+    public void committed(long windowId)
+    {
+      logger.info("committed begin: {}", windowId);
+      long beginTime = System.currentTimeMillis();
+      super.committed(windowId);
+      logger.info("committed end: {}; cost: {}", windowId, System.currentTimeMillis() - beginTime);
     }
 
     @Override

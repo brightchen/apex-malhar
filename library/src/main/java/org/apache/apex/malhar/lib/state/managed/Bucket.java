@@ -33,12 +33,10 @@ import javax.validation.constraints.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.apex.malhar.lib.utils.serde.BufferSlice;
 import org.apache.apex.malhar.lib.utils.serde.KeyValueByteStreamProvider;
 import org.apache.apex.malhar.lib.utils.serde.SliceUtils;
 import org.apache.apex.malhar.lib.utils.serde.WindowedBlockStream;
-import org.apache.hadoop.util.bloom.BloomFilter;
-import org.apache.hadoop.util.bloom.Key;
-import org.apache.hadoop.util.hash.Hash;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -235,10 +233,9 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
 
     protected ConcurrentLinkedQueue<Long> windowsForFreeMemory = new ConcurrentLinkedQueue<>();
 
-    //TODO: serialize BloomFilter? neither java serializable nor kyro serializable
-    private BloomFilter bloomFilter = null;
-    private int numOfInsertion = 10000000;
-    private KeyMemManager keyMemManager = new KeyMemManager();
+    private static int bloomFilterDefaultBitSize = 1000000;
+    private transient SliceBloomFilter bloomFilter = null;
+    private int bloomFilterBitSize = bloomFilterDefaultBitSize;
 
     private DefaultBucket()
     {
@@ -256,7 +253,7 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
     {
       this.managedStateContext = Preconditions.checkNotNull(managedStateContext, "managed state context");
       if (bloomFilter == null) {
-        bloomFilter = new BloomFilter(numOfInsertion, 3, Hash.MURMUR_HASH);
+        bloomFilter = new SliceBloomFilter(bloomFilterBitSize, 0.99);
       }
     }
 
@@ -348,24 +345,24 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
     {
       // This call is lightweight
       releaseMemory();
-      if (!bloomFilter.membershipTest(new Key(keyMemManager.toByteArray(key)))) {
-        return null;
-      }
 
-      key = SliceUtils.toBufferSlice(key);
+
+      Slice value = null;
+      BufferSlice key1 = SliceUtils.toBufferSlice(key);
       switch (readSource) {
         case MEMORY:
-          return getFromMemory(key);
+          value = getFromMemory(key1);
         case READERS:
-          return getFromReaders(key, timeBucket);
+          value = getFromReaders(key1, timeBucket);
         case ALL:
         default:
-          Slice value = getFromMemory(key);
-          if (value != null) {
-            return value;
+          value = getFromMemory(key1);
+          if (value == null) {
+            value = getFromReaders(key1, timeBucket);;
           }
-          return getFromReaders(key, timeBucket);
       }
+
+      return value;
     }
 
     /**
@@ -374,8 +371,26 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
      * @param timeBucket time bucket
      * @return value if key is found in the time bucket; false otherwise
      */
+    public int filtedCount = 0;
+    public int totalCount = 0;
+    public long startTime = System.currentTimeMillis();
     private BucketedValue getValueFromTimeBucketReader(Slice key, long timeBucket)
     {
+      if(System.currentTimeMillis() - startTime > 10000) {
+        System.out.println("Bucket: " + System.identityHashCode(this) + "; filted count: " + filtedCount + "; total count: " + totalCount);
+        if(filtedCount * 2 < totalCount) {
+          //get rid of bloom filter
+          bloomFilter = null;
+        }
+        totalCount = filtedCount = 0;
+        startTime = System.currentTimeMillis();
+      }
+      ++totalCount;
+      boolean notExist = false;
+      if (bloomFilter !=null && !bloomFilter.mightContain(key)) {
+        filtedCount++;
+        return null;
+      }
       FileAccess.FileReader fileReader = readers.get(timeBucket);
       if (fileReader != null) {
         return readValue(fileReader, key, timeBucket);
@@ -424,10 +439,9 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
     @Override
     public void put(Slice key, long timeBucket, Slice value)
     {
-      bloomFilter.add(new Key(keyMemManager.toByteArray(key)));
-
       // This call is lightweight
       releaseMemory();
+
       key = SliceUtils.toBufferSlice(key);
       value = SliceUtils.toBufferSlice(value);
 
@@ -523,6 +537,14 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
     public Map<Slice, BucketedValue> checkpoint(long windowId)
     {
       releaseMemory();
+
+      //the data will write to file only after checkpointed.
+      if (bloomFilter != null) {
+        for(Slice key : flash.keySet()) {
+          bloomFilter.put(key);
+        }
+      }
+
       try {
         //transferring the data from flash to check-pointed state in finally block and re-initializing the flash.
         return flash;
@@ -647,39 +669,24 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
       return valueStream;
     }
 
-    /**
-     * The key need to convert from slice to Byte[] in order to use Hadoop Bloom Filter
-     * which create a lot temporary byte arrays
-     * This class reused the allocated byte arrays.
-     * The assumption is that the length of the key will not vary very large.
-     */
-    private static class KeyMemManager
+    public static int getBloomFilterDefaultBitSize()
     {
-      private transient Map<Integer, byte[]> lengthToArray = Maps.newHashMap();
-      private transient long totalSize;
-      private long maxSize = 1000000;
+      return bloomFilterDefaultBitSize;
+    }
 
-//      public byte[] toByteArray(Slice slice)
-//      {
-//        return slice.toByteArray();
-//      }
+    public static void setBloomFilterDefaultBitSize(int bloomFilterDefaultBitSize)
+    {
+      DefaultBucket.bloomFilterDefaultBitSize = bloomFilterDefaultBitSize;
+    }
 
-      public byte[] toByteArray(Slice slice)
-      {
-        if (totalSize > maxSize) {
-          lengthToArray.clear();
-          totalSize = 0;
-        }
-        byte[] array = lengthToArray.get(slice.length);
-        if (array == null) {
-          array = new byte[slice.length];
-          lengthToArray.put(slice.length, array);
+    public int getBloomFilterBitSize()
+    {
+      return bloomFilterBitSize;
+    }
 
-          totalSize += slice.length;
-        }
-        System.arraycopy(slice.buffer, slice.offset, array, 0, slice.length);
-        return array;
-      }
+    public void setBloomFilterBitSize(int bloomFilterBitSize)
+    {
+      this.bloomFilterBitSize = bloomFilterBitSize;
     }
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultBucket.class);

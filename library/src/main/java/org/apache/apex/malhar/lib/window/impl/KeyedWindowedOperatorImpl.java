@@ -22,6 +22,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.apex.malhar.lib.state.spillable.SpillableSetMultimapImpl;
 import org.apache.apex.malhar.lib.window.Accumulation;
@@ -150,7 +151,6 @@ public class KeyedWindowedOperatorImpl<KeyT, InputValT, AccumT, OutputValT>
   public void endWindow()
   {
     super.endWindow();
-
     updatedKeyStorage.endWindow();
   }
 
@@ -180,9 +180,25 @@ public class KeyedWindowedOperatorImpl<KeyT, InputValT, AccumT, OutputValT>
   @Override
   public void fireNormalTrigger(Window window, boolean fireOnlyUpdatedPanes)
   {
+    long lastTime = System.currentTimeMillis();;
+    long lastEntries = entries;
     if (fireOnlyUpdatedPanes) {
-      for (KeyT key : updatedKeyStorage.get(window)) {
+      Set<KeyT> keys = updatedKeyStorage.get(window);
+      if(keys == null) {
+        return;
+      }
+
+      for (KeyT key : keys) {
         ++entries;
+        if(keys != null) {
+          keys.add(key);
+        }
+        if(System.currentTimeMillis() - lastTime > 5000) {
+          System.out.println("abnormal, updated entries: " + (entries - lastEntries));
+          lastEntries = entries;
+          lastTime = System.currentTimeMillis();
+
+        }
         OutputValT outputVal = accumulation.getOutput(dataStorage.get(window, key));
         if (retractionStorage != null) {
           OutputValT oldValue = retractionStorage.get(window, key);
@@ -196,6 +212,7 @@ public class KeyedWindowedOperatorImpl<KeyT, InputValT, AccumT, OutputValT>
         }
       }
       updatedKeyStorage.removeAll(window);
+      long endTime = System.currentTimeMillis();
       return;
     }
 
