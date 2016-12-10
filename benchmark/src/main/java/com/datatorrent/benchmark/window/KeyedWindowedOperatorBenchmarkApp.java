@@ -35,6 +35,7 @@ import org.apache.apex.malhar.lib.window.impl.KeyedWindowedOperatorImpl;
 import org.apache.apex.malhar.lib.window.impl.SpillableWindowedKeyedStorage;
 import org.apache.hadoop.conf.Configuration;
 
+import com.datatorrent.api.Context;
 import com.datatorrent.api.DAG;
 import com.datatorrent.api.DAG.Locality;
 import com.datatorrent.api.DefaultOutputPort;
@@ -76,6 +77,14 @@ public class KeyedWindowedOperatorBenchmarkApp extends AbstractWindowedOperatorB
     private long totalCount = 0;
 
     private long droppedCount = 0;
+
+    @Override
+    public void setup(Context.OperatorContext context)
+    {
+//      Bucket.DefaultBucket.setDisableBloomFilterByDefault(true);
+      super.setup(context);
+    }
+
     @Override
     public void dropTuple(Tuple input)
     {
