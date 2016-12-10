@@ -33,7 +33,6 @@ import javax.validation.constraints.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.apex.malhar.lib.utils.serde.BufferSlice;
 import org.apache.apex.malhar.lib.utils.serde.KeyValueByteStreamProvider;
 import org.apache.apex.malhar.lib.utils.serde.SliceUtils;
 import org.apache.apex.malhar.lib.utils.serde.WindowedBlockStream;
@@ -195,7 +194,7 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
    * Default bucket.<br/>
    * Not thread-safe.
    */
-  class DefaultBucket implements Bucket
+  public class DefaultBucket implements Bucket
   {
     private final long bucketId;
 
@@ -233,8 +232,10 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
 
     protected ConcurrentLinkedQueue<Long> windowsForFreeMemory = new ConcurrentLinkedQueue<>();
 
+    private static boolean disableBloomFilterByDefault = false;
+    private boolean disableBloomFilter = disableBloomFilterByDefault;
     private static int bloomFilterDefaultBitSize = 1000000;
-    private transient SliceBloomFilter bloomFilter = null;
+    private SliceBloomFilter bloomFilter = null;
     private int bloomFilterBitSize = bloomFilterDefaultBitSize;
 
     private DefaultBucket()
@@ -252,7 +253,7 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
     public void setup(@NotNull ManagedStateContext managedStateContext)
     {
       this.managedStateContext = Preconditions.checkNotNull(managedStateContext, "managed state context");
-      if (bloomFilter == null) {
+      if (!disableBloomFilter && bloomFilter == null) {
         bloomFilter = new SliceBloomFilter(bloomFilterBitSize, 0.99);
       }
     }
@@ -345,24 +346,55 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
     {
       // This call is lightweight
       releaseMemory();
-
-
-      Slice value = null;
-      BufferSlice key1 = SliceUtils.toBufferSlice(key);
+      key = SliceUtils.toBufferSlice(key);
       switch (readSource) {
         case MEMORY:
-          value = getFromMemory(key1);
+          return getFromMemory(key);
         case READERS:
-          value = getFromReaders(key1, timeBucket);
+          return getFromReaders(key, timeBucket);
         case ALL:
         default:
-          value = getFromMemory(key1);
-          if (value == null) {
-            value = getFromReaders(key1, timeBucket);;
+          Slice value = getFromMemory(key);
+          if (value != null) {
+            return value;
           }
+          return getFromReaders(key, timeBucket);
       }
+    }
 
-      return value;
+
+    private int filtedCount = 0;
+    private int unfiltedCount = 0;
+    private long verifyBloomFilterBeginTime = 0;
+    private long verifyBloomFilterInterval = 5000;
+    /**
+     * Test the result of using bloom filter and remove it if it not helpful for improving the performance.
+     *
+     * @param mightContain true if collection might contain the value
+     */
+    private void verifyBloomFilter(boolean mightContain)
+    {
+      if (!mightContain) {
+        filtedCount++;
+      } else {
+        unfiltedCount++;
+      }
+      long now = System.currentTimeMillis();
+      if (verifyBloomFilterBeginTime == 0) {
+        verifyBloomFilterBeginTime = now;
+      } else if (now - verifyBloomFilterBeginTime > verifyBloomFilterInterval) {
+        if (unfiltedCount > filtedCount * 4) {
+          unloadBloomFilter();
+        } else {
+          filtedCount = unfiltedCount = 0;
+          verifyBloomFilterBeginTime = now;
+        }
+      }
+    }
+
+    private void unloadBloomFilter()
+    {
+      bloomFilter = null;
     }
 
     /**
@@ -371,29 +403,27 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
      * @param timeBucket time bucket
      * @return value if key is found in the time bucket; false otherwise
      */
-    public int filtedCount = 0;
-    public int totalCount = 0;
-    public long startTime = System.currentTimeMillis();
     private BucketedValue getValueFromTimeBucketReader(Slice key, long timeBucket)
     {
-      if(System.currentTimeMillis() - startTime > 10000) {
-        System.out.println("Bucket: " + System.identityHashCode(this) + "; filted count: " + filtedCount + "; total count: " + totalCount);
-        if(filtedCount * 2 < totalCount) {
-          //get rid of bloom filter
-          bloomFilter = null;
+      boolean notExists = false;
+      if (bloomFilter != null) {
+        boolean mightContain = bloomFilter.mightContain(key);
+
+        verifyBloomFilter(mightContain);
+
+        if (!mightContain) {
+          notExists = true;
+          //return null;
         }
-        totalCount = filtedCount = 0;
-        startTime = System.currentTimeMillis();
       }
-      ++totalCount;
-      boolean notExist = false;
-      if (bloomFilter !=null && !bloomFilter.mightContain(key)) {
-        filtedCount++;
-        return null;
-      }
+
       FileAccess.FileReader fileReader = readers.get(timeBucket);
       if (fileReader != null) {
-        return readValue(fileReader, key, timeBucket);
+        BucketedValue value = readValue(fileReader, key, timeBucket);
+        if(notExists && value != null) {
+          System.out.println("Problem: BloomFilter check not exists, but actual have value: " + value.getValue() + " for key: " + key);
+        }
+        return value;
       }
       //file reader is not loaded and is null
       try {
@@ -485,6 +515,14 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
         entryIter.remove();
 
         for (Map.Entry<Slice, BucketedValue> entry : windowData.entrySet()) {
+          /**
+           * The data still in memory and reachable before the memory released
+           * So put key into bloom filter here
+           */
+          if (bloomFilter != null) {
+            bloomFilter.put(entry.getKey());
+          }
+
           memoryFreed += entry.getKey().length + entry.getValue().getSize();
         }
       }
@@ -537,13 +575,6 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
     public Map<Slice, BucketedValue> checkpoint(long windowId)
     {
       releaseMemory();
-
-      //the data will write to file only after checkpointed.
-      if (bloomFilter != null) {
-        for(Slice key : flash.keySet()) {
-          bloomFilter.put(key);
-        }
-      }
 
       try {
         //transferring the data from flash to check-pointed state in finally block and re-initializing the flash.
@@ -611,6 +642,7 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
     @Override
     public void recoveredData(long recoveredWindow, Map<Slice, BucketedValue> data)
     {
+      System.out.println("===========recoveredData");
       checkpointedData.put(recoveredWindow, data);
     }
 
@@ -688,6 +720,28 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
     {
       this.bloomFilterBitSize = bloomFilterBitSize;
     }
+
+    public static boolean isDisableBloomFilterByDefault()
+    {
+      return disableBloomFilterByDefault;
+    }
+
+    public static void setDisableBloomFilterByDefault(boolean disableBloomFilterByDefault)
+    {
+      DefaultBucket.disableBloomFilterByDefault = disableBloomFilterByDefault;
+    }
+
+    public boolean isDisableBloomFilter()
+    {
+      return disableBloomFilter;
+    }
+
+    public void setDisableBloomFilter(boolean disableBloomFilter)
+    {
+      this.disableBloomFilter = disableBloomFilter;
+      this.unloadBloomFilter();
+    }
+
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultBucket.class);
 

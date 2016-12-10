@@ -285,8 +285,8 @@ public class SpillableMapImpl<K, V> implements Spillable.SpillableMap<K, V>, Spi
 
     endWindowCost += System.currentTimeMillis() - startTime;
     if (++windows == 20) {
-      logger.info("==== Instance: {}, endWindow cost: {}; changedKeys: {}, removedKeys: {}, cacheCount: {}, nullCount: {}, storeCount: {},",
-          System.identityHashCode(this), endWindowCost, changedKeys, removedKeys, cacheCount, nullCount, storeCount);
+//      logger.info("==== Instance: {}, endWindow cost: {}; changedKeys: {}, removedKeys: {}, cacheCount: {}, nullCount: {}, storeCount: {},",
+//          System.identityHashCode(this), endWindowCost, changedKeys, removedKeys, cacheCount, nullCount, storeCount);
 
       windows = 0;
       endWindowCost = 0;

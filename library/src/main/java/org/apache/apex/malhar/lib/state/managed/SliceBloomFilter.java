@@ -41,7 +41,7 @@ public class SliceBloomFilter
 
   /**
    * Set the attributes to the empty Bloom filter. The total length of the Bloom
-   * filter will be c*n.
+   * filter will be bitsPerElement*expectedNumberOfFilterElements.
    *
    * @param bitsPerElement
    *          is the number of bits used per element.
@@ -79,7 +79,6 @@ public class SliceBloomFilter
           expectedNumberOfElements, (int)Math.ceil(-(Math.log(falsePositiveProbability) / Math.log(2))));
     }
   }
-
 
   /**
    * Generate integer array based on the hash function till the number of
@@ -200,7 +199,6 @@ public class SliceBloomFilter
     return true;
   }
 
-
   /**
    * Read a single bit from the Bloom filter.
    *
@@ -298,8 +296,7 @@ public class SliceBloomFilter
     this.hasher = hasher;
   }
 
-
-  static class HashFunction
+  public static final class HashFunction
   {
     private static final long SEED = 0x7f3a21eaL;
     private static long X64_128_C1 = 0x87c37b91114253d5L;
@@ -323,12 +320,12 @@ public class SliceBloomFilter
       long h2 = SEED;
 
       //the offset related to the begin of slice
-      int sliceOffset = 0;
-      while (slice.length - sliceOffset >= 4) {
-        long k1 = getLong(slice, sliceOffset);
-        sliceOffset += 2; //size of long count by int
-        long k2 = getLong(slice, sliceOffset);
-        sliceOffset += 2;
+      int relativeOffset = 0;
+      while (slice.length - relativeOffset >= 16) {
+        long k1 = getLong(slice, slice.offset + relativeOffset);
+        relativeOffset += 8; //size of long count by int
+        long k2 = getLong(slice, slice.offset + relativeOffset);
+        relativeOffset += 8;
 
         h1 ^= mixK1(k1);
 
@@ -343,55 +340,56 @@ public class SliceBloomFilter
         h2 = h2 * 5 + 0x38495ab5;
       }
 
-      if(slice.length > sliceOffset) {
+      if (slice.length > relativeOffset) {
         long k1 = 0;
         long k2 = 0;
-        switch (slice.length - sliceOffset) {
+        int absoluteOffset = slice.offset + relativeOffset;
+        switch (slice.length - relativeOffset) {
           case 15:
-            k2 ^= (long) (slice.buffer[14] & UNSIGNED_MASK) << 48;
+            k2 ^= (long)(slice.buffer[absoluteOffset + 14] & UNSIGNED_MASK) << 48; // fall through
 
           case 14:
-            k2 ^= (long) (slice.buffer[13] & UNSIGNED_MASK) << 40;
+            k2 ^= (long)(slice.buffer[absoluteOffset + 13] & UNSIGNED_MASK) << 40; // fall through
 
           case 13:
-            k2 ^= (long) (slice.buffer[12] & UNSIGNED_MASK) << 32;
+            k2 ^= (long)(slice.buffer[absoluteOffset + 12] & UNSIGNED_MASK) << 32; // fall through
 
           case 12:
-            k2 ^= (long) (slice.buffer[11] & UNSIGNED_MASK) << 24;
+            k2 ^= (long)(slice.buffer[absoluteOffset + 11] & UNSIGNED_MASK) << 24; // fall through
 
           case 11:
-            k2 ^= (long) (slice.buffer[10] & UNSIGNED_MASK) << 16;
+            k2 ^= (long)(slice.buffer[absoluteOffset + 10] & UNSIGNED_MASK) << 16; // fall through
 
           case 10:
-            k2 ^= (long) (slice.buffer[9] & UNSIGNED_MASK) << 8;
+            k2 ^= (long)(slice.buffer[absoluteOffset + 9] & UNSIGNED_MASK) << 8; // fall through
 
           case 9:
-            k2 ^= slice.buffer[8] & UNSIGNED_MASK;
+            k2 ^= slice.buffer[absoluteOffset + 8] & UNSIGNED_MASK; // fall through
 
           case 8:
-            k1 ^= getLong(slice, sliceOffset);
+            k1 ^= getLong(slice, absoluteOffset);
             break;
 
           case 7:
-            k1 ^= (long) (slice.buffer[6] & UNSIGNED_MASK) << 48;
+            k1 ^= (long)(slice.buffer[absoluteOffset + 6] & UNSIGNED_MASK) << 48; // fall through
 
           case 6:
-            k1 ^= (long) (slice.buffer[5] & UNSIGNED_MASK) << 40;
+            k1 ^= (long)(slice.buffer[absoluteOffset + 5] & UNSIGNED_MASK) << 40; // fall through
 
           case 5:
-            k1 ^= (long) (slice.buffer[4] & UNSIGNED_MASK) << 32;
+            k1 ^= (long)(slice.buffer[absoluteOffset + 4] & UNSIGNED_MASK) << 32; // fall through
 
           case 4:
-            k1 ^= (long) (slice.buffer[3] & UNSIGNED_MASK) << 24;
+            k1 ^= (long)(slice.buffer[absoluteOffset + 3] & UNSIGNED_MASK) << 24; // fall through
 
           case 3:
-            k1 ^= (long) (slice.buffer[2] & UNSIGNED_MASK) << 16;
+            k1 ^= (long)(slice.buffer[absoluteOffset + 2] & UNSIGNED_MASK) << 16; // fall through
 
           case 2:
-            k1 ^= (long) (slice.buffer[1] & UNSIGNED_MASK) << 8;
+            k1 ^= (long)(slice.buffer[absoluteOffset + 1] & UNSIGNED_MASK) << 8; // fall through
 
           case 1:
-            k1 ^= slice.buffer[0] & UNSIGNED_MASK;
+            k1 ^= slice.buffer[absoluteOffset] & UNSIGNED_MASK;
             break;
 
           default:
@@ -421,12 +419,16 @@ public class SliceBloomFilter
       return h1;
     }
 
-    private static long getLong(Slice slice, int sliceOffset)
+    private static long getLong(Slice slice, int absoluteOffset)
     {
-      long value = slice.buffer[slice.offset + sliceOffset];
-      value <<= 32;
-      value += slice.buffer[slice.offset + sliceOffset + 1];
-      return value;
+      return ((((long)slice.buffer[absoluteOffset++]) << 56) |
+          (((long)slice.buffer[absoluteOffset++] & 0xff) << 48) |
+          (((long)slice.buffer[absoluteOffset++] & 0xff) << 40) |
+          (((long)slice.buffer[absoluteOffset++] & 0xff) << 32) |
+          (((long)slice.buffer[absoluteOffset++] & 0xff) << 24) |
+          (((long)slice.buffer[absoluteOffset++] & 0xff) << 16) |
+          (((long)slice.buffer[absoluteOffset++] & 0xff) <<  8) |
+          (((long)slice.buffer[absoluteOffset++] & 0xff)      ));
     }
 
     private static long mixK1(long k1)
@@ -441,7 +443,7 @@ public class SliceBloomFilter
     private static long mixK2(long k2)
     {
       k2 *= X64_128_C2;
-      k2 = Long.rotateLeft(k2,  33);
+      k2 = Long.rotateLeft(k2, 33);
       k2 *= X64_128_C1;
 
       return k2;

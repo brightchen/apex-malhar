@@ -184,7 +184,11 @@ public class SpillableSetImpl<T> implements Spillable.SpillableSet<T>, Spillable
       @Override
       public boolean hasNext()
       {
+        int loop = 0;
         while (cur != null) {
+          if(++loop % 10000 == 0) {
+            System.out.println("Abnormal: hasNext() looped " + loop );
+          }
           ListNode<T> node = map.get(cur);
           if (node == null) {
             return false;
