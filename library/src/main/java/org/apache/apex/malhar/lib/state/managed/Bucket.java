@@ -413,7 +413,7 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
 
         if (!mightContain) {
           notExists = true;
-          //return null;
+          return null;
         }
       }
 
