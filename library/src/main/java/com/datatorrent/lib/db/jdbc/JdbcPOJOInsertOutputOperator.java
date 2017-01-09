@@ -67,7 +67,7 @@ public class JdbcPOJOInsertOutputOperator extends AbstractJdbcPOJOOutputOperator
        * columnNamesSet is the set having column names given by the user
        */
       HashSet<String> columnNamesSet = new HashSet<>();
-      if (getFieldInfos() == null) { // then assume direct mapping
+      if (getFieldInfos() == null || getFieldInfos().size() == 0) { // then assume direct mapping
         LOG.info("FieldInfo missing. Assuming direct mapping between POJO fields and DB columns");
       } else {
         // FieldInfo supplied by user
@@ -93,7 +93,7 @@ public class JdbcPOJOInsertOutputOperator extends AbstractJdbcPOJOOutputOperator
   @Override
   public void activate(OperatorContext context)
   {
-    if (getFieldInfos() == null) {
+    if (getFieldInfos() == null || getFieldInfos().size() == 0) {
       Field[] fields = pojoClass.getDeclaredFields();
       // Create fieldInfos in case of direct mapping
       List<JdbcFieldInfo> fieldInfos = Lists.newArrayList();
@@ -163,13 +163,12 @@ public class JdbcPOJOInsertOutputOperator extends AbstractJdbcPOJOOutputOperator
   {
     ResultSet rsColumns;
     DatabaseMetaData meta = store.getConnection().getMetaData();
+    rsColumns = meta.getColumns(null, null, getTablename(), null);
     /**Identifiers (table names, column names etc.) may be stored internally in either uppercase or lowercase.**/
-    rsColumns = meta.getColumns(null, null, getTablename().toUpperCase(), null);
     if (!rsColumns.isBeforeFirst()) {
-      rsColumns = meta.getColumns(null, null, getTablename().toLowerCase(), null);
+      rsColumns = meta.getColumns(null, null, getTablename().toUpperCase(), null);
       if (!rsColumns.isBeforeFirst()) {
-        /** If the table name is in quotes then some Databases store it without doing any uppercase or lowercase conversions */
-        rsColumns = meta.getColumns(null, null, getTablename(), null);
+        rsColumns = meta.getColumns(null, null, getTablename().toLowerCase(), null);
         if (!rsColumns.isBeforeFirst()) {
           throw new RuntimeException("Table name not found");
         }
