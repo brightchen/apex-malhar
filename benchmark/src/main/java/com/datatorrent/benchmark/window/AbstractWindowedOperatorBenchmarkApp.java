@@ -25,6 +25,7 @@ import org.joda.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.apex.malhar.lib.state.managed.UnboundedTimeBucketAssigner;
 import org.apache.apex.malhar.lib.state.spillable.SpillableComplexComponentImpl;
 import org.apache.apex.malhar.lib.state.spillable.SpillableStateStore;
 import org.apache.apex.malhar.lib.state.spillable.managed.ManagedTimeUnifiedStateSpillableStateStore;
@@ -50,7 +51,8 @@ import com.datatorrent.benchmark.window.WindowedOperatorBenchmarkApp.WindowedGen
 import com.datatorrent.lib.fileaccess.TFileImpl;
 import com.datatorrent.lib.stream.DevNull;
 
-public abstract class AbstractWindowedOperatorBenchmarkApp<G extends Operator, O extends AbstractWindowedOperator> implements StreamingApplication
+public abstract class AbstractWindowedOperatorBenchmarkApp<G extends Operator, O extends AbstractWindowedOperator>
+    implements StreamingApplication
 {
   protected static final String PROP_STORE_PATH = "dt.application.WindowedOperatorBenchmark.storeBasePath";
   protected static final String DEFAULT_BASE_PATH = "WindowedOperatorBenchmark/Store";
@@ -80,7 +82,8 @@ public abstract class AbstractWindowedOperatorBenchmarkApp<G extends Operator, O
 
 //    WatermarkGenerator watermarkGenerator = new WatermarkGenerator();
 //    dag.addOperator("WatermarkGenerator", watermarkGenerator);
-//    dag.addStream("Control", watermarkGenerator.control, windowedOperator.controlInput).setLocality(Locality.CONTAINER_LOCAL);
+//    dag.addStream("Control", watermarkGenerator.control, windowedOperator.controlInput)
+//      .setLocality(Locality.CONTAINER_LOCAL);
 
     DevNull output = dag.addOperator("output", new DevNull());
     dag.addStream("output", windowedOperator.output, output.data).setLocality(Locality.CONTAINER_LOCAL);
@@ -106,12 +109,14 @@ public abstract class AbstractWindowedOperatorBenchmarkApp<G extends Operator, O
       windowedOperator.setDataStorage(createDataStorage(sccImpl));
       windowedOperator.setRetractionStorage(createRetractionStorage(sccImpl));
       windowedOperator.setWindowStateStorage(new InMemoryWindowedStorage());
+      setUpdatedKeyStorage(windowedOperator, conf, sccImpl);
       windowedOperator.setAccumulation(createAccumulation());
 
       windowedOperator.setAllowedLateness(Duration.millis(ALLOWED_LATENESS));
       windowedOperator.setWindowOption(new WindowOption.TimeWindows(Duration.standardMinutes(1)));
       //accumulating mode
-      windowedOperator.setTriggerOption(TriggerOption.AtWatermark().withEarlyFiringsAtEvery(Duration.standardSeconds(1)).accumulatingFiredPanes().firingOnlyUpdatedPanes());
+      windowedOperator.setTriggerOption(TriggerOption.AtWatermark()
+          .withEarlyFiringsAtEvery(Duration.standardSeconds(1)).accumulatingFiredPanes().firingOnlyUpdatedPanes());
       windowedOperator.setFixedWatermark(30000);
       //windowedOperator.setTriggerOption(TriggerOption.AtWatermark());
 
@@ -119,6 +124,10 @@ public abstract class AbstractWindowedOperatorBenchmarkApp<G extends Operator, O
     } catch (Exception e) {
       throw Throwables.propagate(e);
     }
+  }
+
+  protected void setUpdatedKeyStorage(O windowedOperator, Configuration conf, SpillableComplexComponentImpl sccImpl)
+  {
   }
 
   protected abstract WindowedStorage createDataStorage(SpillableComplexComponentImpl sccImpl);
@@ -133,6 +142,7 @@ public abstract class AbstractWindowedOperatorBenchmarkApp<G extends Operator, O
   {
     String basePath = getStoreBasePath(conf);
     ManagedTimeUnifiedStateSpillableStateStore store = new ManagedTimeUnifiedStateSpillableStateStore();
+    store.setTimeBucketAssigner(new UnboundedTimeBucketAssigner());
     store.getTimeBucketAssigner().setBucketSpan(Duration.millis(10000));
     ((TFileImpl.DTFileImpl)store.getFileAccess()).setBasePath(basePath);
 
@@ -147,7 +157,6 @@ public abstract class AbstractWindowedOperatorBenchmarkApp<G extends Operator, O
     }
     return basePath;
   }
-
 
   public static class TestStatsListener implements StatsListener, Serializable
   {

@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 import javax.validation.ValidationException;
 
@@ -83,12 +84,14 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
   protected long currentWatermark = -1;
   private boolean triggerAtWatermark;
   protected long earlyTriggerCount;
-  private long earlyTriggerMillis;
+  protected long earlyTriggerMillis;
   protected long lateTriggerCount;
-  private long lateTriggerMillis;
+  protected long lateTriggerMillis;
   private long currentDerivedTimestamp = -1;
   private long timeIncrement;
   protected long fixedWatermarkMillis = -1;
+  private transient long streamingWindowId;
+  private transient TreeMap<Long, Long> streamingWindowToLatenessHorizon = new TreeMap<>();
 
   private Map<String, Component<Context.OperatorContext>> components = new HashMap<>();
 
@@ -407,7 +410,6 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
   public void dropTuple(Tuple input)
   {
     // do nothing
-    LOG.debug("Dropping late tuple {}", input);
   }
 
   @Override
@@ -465,6 +467,7 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
     } else {
       currentDerivedTimestamp += timeIncrement;
     }
+    streamingWindowId = windowId;
   }
 
   /**
@@ -517,6 +520,7 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
           }
         }
       }
+      streamingWindowToLatenessHorizon.put(streamingWindowId, horizon);
       controlOutput.emit(new WatermarkImpl(nextWatermark));
       this.currentWatermark = nextWatermark;
     }
@@ -543,11 +547,16 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
     }
   }
 
+  protected boolean isFiringOnlyUpdatedPanes()
+  {
+    return triggerOption.isFiringOnlyUpdatedPanes();
+  }
+
   @Override
   public void fireTrigger(Window window, WindowState windowState)
   {
     if (triggerOption.getAccumulationMode() == TriggerOption.AccumulationMode.ACCUMULATING_AND_RETRACTING) {
-      fireRetractionTrigger(window, triggerOption.isFiringOnlyUpdatedPanes());
+      fireRetractionTrigger(window, isFiringOnlyUpdatedPanes());
     }
     fireNormalTrigger(window, triggerOption.isFiringOnlyUpdatedPanes());
     windowState.lastTriggerFiredTime = currentDerivedTimestamp;
@@ -617,6 +626,16 @@ public abstract class AbstractWindowedOperator<InputT, OutputT, DataStorageT ext
       if (component instanceof CheckpointNotificationListener) {
         ((CheckpointNotificationListener)component).committed(windowId);
       }
+    }
+    Long floorWindowId = streamingWindowToLatenessHorizon.floorKey(windowId);
+    if (floorWindowId != null) {
+      long horizon = streamingWindowToLatenessHorizon.get(floorWindowId);
+      windowStateMap.purge(horizon);
+      dataStorage.purge(horizon);
+      if (retractionStorage != null) {
+        retractionStorage.purge(horizon);
+      }
+      streamingWindowToLatenessHorizon.headMap(windowId, true).clear();
     }
   }
 }
