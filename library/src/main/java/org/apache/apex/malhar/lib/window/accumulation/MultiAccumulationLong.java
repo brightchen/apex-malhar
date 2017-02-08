@@ -18,42 +18,52 @@
  */
 package org.apache.apex.malhar.lib.window.accumulation;
 
-public class MultiAccumulationLong extends MultiAccumulation<Long>
+public class MultiAccumulationLong extends MultiAccumulation<Long, Long>
 {
-  @Override
-  protected Long min(Long oldValue, Long input)
+  public static class AccumulationValuesLong extends AbstractAccumulationValues<Long, Long>
   {
-    if(oldValue == null) {
-      return input;
+    @Override
+    protected void accumulateValue(AccumulationType type, Long value)
+    {
+      Long oldValue = accumulationTypeToValue.get(type);
+      switch(type) {
+        case MAX:
+          if (oldValue < value) {
+            accumulationTypeToValue.put(type, value);
+          }
+          break;
+        case MIN:
+          if (oldValue > value) {
+            accumulationTypeToValue.put(type, value);
+          }
+          break;
+        case SUM:
+          accumulationTypeToValue.put(type, oldValue + value);
+          break;
+      }
     }
-    if(input == null) {
-      return oldValue;
+
+    @Override
+    protected void mergeValue(AccumulationType type, Long otherValue)
+    {
+      accumulateValue(type, otherValue);
     }
-    return Math.min(oldValue, input);
+
+    @Override
+    protected double doubleValue(Long value)
+    {
+      return value;
+    }
   }
 
-  @Override
-  protected Long max(Long oldValue, Long input)
+  public MultiAccumulationLong(boolean includeCount, boolean includeAverage, AccumulationType ... accumulationTypes)
   {
-    if(oldValue == null) {
-      return input;
-    }
-    if(input == null) {
-      return oldValue;
-    }
-    return Math.max(oldValue, input);
+    defaultAccumulationValues = new AccumulationValuesLong();
+    setAccumulateTypes(includeCount, includeAverage, accumulationTypes);
   }
 
-  @Override
-  protected Long sum(Long oldValue, Long input)
+  public MultiAccumulationLong()
   {
-    if(oldValue == null) {
-      return input;
-    }
-    if(input == null) {
-      return oldValue;
-    }
-    return oldValue + input;
+    this(true, true, AccumulationType.values());
   }
-
 }

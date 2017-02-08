@@ -19,13 +19,15 @@
 package org.apache.apex.malhar.lib.window.accumulation;
 
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.apex.malhar.lib.window.Accumulation;
 import org.apache.commons.lang3.mutable.MutableLong;
-import org.apache.commons.lang3.tuple.MutablePair;
 
 import com.google.common.collect.Maps;
-public abstract class MultiAccumulation<InputT extends Number> implements Accumulation<InputT, MutablePair<MutableLong, Map<MultiAccumulation.AccumulationType, InputT>>, MutablePair<MutableLong, Map<MultiAccumulation.AccumulationType, InputT>>>
+import com.google.common.collect.Sets;
+
+public abstract class MultiAccumulation<InputT extends Number, AccumT> implements Accumulation<InputT, MultiAccumulation.AccumulationValues, MultiAccumulation.AccumulationValues>
 {
   public static enum AccumulationType
   {
@@ -34,92 +36,125 @@ public abstract class MultiAccumulation<InputT extends Number> implements Accumu
     SUM
   }
 
-  @Override
-  public MutablePair<MutableLong, Map<AccumulationType, InputT>> defaultAccumulatedValue()
+  public static interface AccumulationValues<InputT, AccumT>
   {
-    Map<MultiAccumulation.AccumulationType, InputT> values = Maps.newEnumMap(AccumulationType.class);
+    public void setAccumulateTypes(boolean includeCount, boolean includeAverage, AccumulationType ... accumulationTypes);
+    public void accumulateValue(InputT value);
+    public void merge(AccumulationValues<InputT, AccumT> otherValue);
+    public AccumT getAccumulation(AccumulationType zccumulationType);
+    public MutableLong getCount();
+    public double getAverage();
+  }
 
-    return new MutablePair<>(new MutableLong(0), values);
+  public static abstract class AbstractAccumulationValues<InputT, AccumT> implements AccumulationValues<InputT, AccumT>
+  {
+    protected Map<AccumulationType, AccumT> accumulationTypeToValue = Maps.newEnumMap(AccumulationType.class);
+    protected MutableLong count = new MutableLong(0);
+
+    protected boolean includeCount;
+    protected Set<AccumulationType> accumulationTypes;
+
+    @Override
+    public void setAccumulateTypes(boolean includeCount, boolean includeAverage, AccumulationType ... accumulationTypes)
+    {
+      this.includeCount = includeCount;
+      this.accumulationTypes = Sets.newHashSet(accumulationTypes);
+      if (includeAverage) {
+        this.accumulationTypes.add(AccumulationType.SUM);
+        this.includeCount = true;
+      }
+    }
+
+    @Override
+    public AccumT getAccumulation(AccumulationType accumulationType)
+    {
+      return accumulationTypeToValue.get(accumulationType);
+    }
+
+    @Override
+    public MutableLong getCount()
+    {
+      return count;
+    }
+
+    @Override
+    public double getAverage()
+    {
+      return doubleValue(accumulationTypeToValue.get(AccumulationType.SUM)) / getCount().longValue();
+    }
+
+    protected abstract double doubleValue(AccumT value);
+
+    @Override
+    public void accumulateValue(InputT value)
+    {
+      for (AccumulationType type : accumulationTypes) {
+        accumulateValue(type, value);
+      }
+    }
+
+    protected abstract void accumulateValue(AccumulationType type, InputT value);
+
+    @Override
+    public void merge(AccumulationValues<InputT, AccumT> otherValues)
+    {
+      for (AccumulationType type : accumulationTypes) {
+        mergeValue(type, otherValues.getAccumulation(type));
+      }
+    }
+
+    protected abstract void mergeValue(AccumulationType type, AccumT otherValue);
+  }
+
+//  @Override
+//  public AccumulationValues<InputT, AccumT> defaultAccumulatedValue()
+//  {
+//    return new AbstractAccumulationValues();
+//  }
+
+
+  protected AccumulationValues defaultAccumulationValues;
+
+  public void setAccumulateTypes(boolean includeCount, boolean includeAverage, AccumulationType ... accumulationTypes)
+  {
+    defaultAccumulationValues.setAccumulateTypes(includeCount, includeAverage, accumulationTypes);
   }
 
   @Override
-  public MutablePair<MutableLong, Map<AccumulationType, InputT>> accumulate(
-      MutablePair<MutableLong, Map<AccumulationType, InputT>> accumulatedValue, InputT input)
+  public MultiAccumulation.AccumulationValues defaultAccumulatedValue()
   {
-    accumulatedValue.left.add(1);
+    return defaultAccumulationValues;
+  }
 
-    Map<AccumulationType, InputT> values = accumulatedValue.right;
-
-    {
-      InputT oldValue = values.get(AccumulationType.MAX);
-      InputT newValue = oldValue == null ? null : max(oldValue, input);
-      values.put(AccumulationType.MAX, newValue);
-    }
-
-    {
-      InputT oldValue = values.get(AccumulationType.MIN);
-      InputT newValue = oldValue == null ? null : min(oldValue, input);
-      values.put(AccumulationType.MIN, newValue);
-    }
-
-    {
-      InputT oldValue = values.get(AccumulationType.SUM);
-      InputT newValue = oldValue == null ? null : min(oldValue, input);
-      values.put(AccumulationType.SUM, newValue);
-    }
-
+  @Override
+  public AccumulationValues accumulate(AccumulationValues accumulatedValue, InputT input)
+  {
+    accumulatedValue.getCount().increment();
+    accumulatedValue.accumulateValue(input);
     return accumulatedValue;
   }
 
-  protected abstract InputT min(InputT oldValue, InputT input);
-
-  protected abstract InputT max(InputT oldValue, InputT input);
-
-  protected abstract InputT sum(InputT oldValue, InputT input);
 
   @Override
-  public MutablePair<MutableLong, Map<AccumulationType, InputT>> merge(
-      MutablePair<MutableLong, Map<AccumulationType, InputT>> accumulatedValue1,
-      MutablePair<MutableLong, Map<AccumulationType, InputT>> accumulatedValue2)
+  public AccumulationValues merge(
+      AccumulationValues accumulatedValue1,
+      AccumulationValues accumulatedValue2)
   {
-    accumulatedValue1.getLeft().add(accumulatedValue2.getLeft().longValue());
-
-    Map<AccumulationType, InputT> values1 = accumulatedValue1.right;
-    Map<AccumulationType, InputT> values2 = accumulatedValue2.right;
-
-    {
-      InputT oldValue = values1.get(AccumulationType.MAX);
-      InputT newValue = oldValue == null ? null : max(oldValue, values2.get(AccumulationType.MAX));
-      values1.put(AccumulationType.MAX, newValue);
-    }
-
-    {
-      InputT oldValue = values1.get(AccumulationType.MIN);
-      InputT newValue = oldValue == null ? null : min(oldValue, values2.get(AccumulationType.MIN));
-      values1.put(AccumulationType.MIN, newValue);
-    }
-
-    {
-      InputT oldValue = values1.get(AccumulationType.SUM);
-      InputT newValue = oldValue == null ? null : sum(oldValue, values2.get(AccumulationType.SUM));
-      values1.put(AccumulationType.SUM, newValue);
-    }
-
+    accumulatedValue1.getCount().add(accumulatedValue2.getCount());
+    accumulatedValue1.merge(accumulatedValue2);
     return accumulatedValue1;
   }
 
   @Override
-  public MutablePair<MutableLong, Map<AccumulationType, InputT>> getOutput(
-      MutablePair<MutableLong, Map<AccumulationType, InputT>> accumulatedValue)
+  public AccumulationValues getOutput(AccumulationValues accumulatedValue)
   {
     return accumulatedValue;
   }
 
   @Override
-  public MutablePair<MutableLong, Map<AccumulationType, InputT>> getRetraction(
-      MutablePair<MutableLong, Map<AccumulationType, InputT>> value)
+  public AccumulationValues getRetraction(AccumulationValues value)
   {
-    // TODO
     return null;
   }
+
 }
