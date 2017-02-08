@@ -2,14 +2,18 @@ package org.apache.apex.malhar.lib.window.accumulation;
 
 import org.apache.commons.lang3.mutable.MutableDouble;
 
-public class MultiAccumulationMutableDouble extends MultiAccumulation<Double, MutableDouble>
+public class MultiAccumulationMutableDouble extends MultiAccumulation<Double, MutableDouble, MultiAccumulationMutableDouble.AccumulationValuesMutableDouble>
 {
-  public static class AccumulationValuesMutableDouble extends AbstractAccumulationValues<Double, MutableDouble>
+  public static class AccumulationValuesMutableDouble extends MultiAccumulation.AbstractAccumulationValues<Double, MutableDouble>
   {
     @Override
     protected void accumulateValue(AccumulationType type, Double value)
     {
       MutableDouble oldValue = accumulationTypeToValue.get(type);
+      if (oldValue == null) {
+        accumulationTypeToValue.put(type, new MutableDouble(value));
+        return;
+      }
       switch (type) {
         case MAX:
           if (oldValue.longValue() < value) {
@@ -24,6 +28,8 @@ public class MultiAccumulationMutableDouble extends MultiAccumulation<Double, Mu
         case SUM:
           oldValue.add(value);
           break;
+        default:
+          throw new RuntimeException("Unexpected AccumulationType");
       }
     }
 

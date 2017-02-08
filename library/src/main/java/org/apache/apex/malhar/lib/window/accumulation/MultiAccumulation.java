@@ -27,7 +27,8 @@ import org.apache.commons.lang3.mutable.MutableLong;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
-public abstract class MultiAccumulation<InputT extends Number, AccumT> implements Accumulation<InputT, MultiAccumulation.AccumulationValues, MultiAccumulation.AccumulationValues>
+public abstract class MultiAccumulation<InputT extends Number, AccumT, AV extends MultiAccumulation.AccumulationValues>
+    implements Accumulation<InputT, AV, AV>
 {
   public static enum AccumulationType
   {
@@ -39,14 +40,19 @@ public abstract class MultiAccumulation<InputT extends Number, AccumT> implement
   public static interface AccumulationValues<InputT, AccumT>
   {
     public void setAccumulateTypes(boolean includeCount, boolean includeAverage, AccumulationType ... accumulationTypes);
+
     public void accumulateValue(InputT value);
+
     public void merge(AccumulationValues<InputT, AccumT> otherValue);
+
     public AccumT getAccumulation(AccumulationType zccumulationType);
+
     public MutableLong getCount();
+
     public double getAverage();
   }
 
-  public static abstract class AbstractAccumulationValues<InputT, AccumT> implements AccumulationValues<InputT, AccumT>
+  public abstract static class AbstractAccumulationValues<InputT, AccumT> implements AccumulationValues<InputT, AccumT>
   {
     protected Map<AccumulationType, AccumT> accumulationTypeToValue = Maps.newEnumMap(AccumulationType.class);
     protected MutableLong count = new MutableLong(0);
@@ -58,9 +64,13 @@ public abstract class MultiAccumulation<InputT extends Number, AccumT> implement
     public void setAccumulateTypes(boolean includeCount, boolean includeAverage, AccumulationType ... accumulationTypes)
     {
       this.includeCount = includeCount;
-      this.accumulationTypes = Sets.newHashSet(accumulationTypes);
+      this.accumulationTypes = accumulationTypes == null ? null : Sets.newHashSet(accumulationTypes);
       if (includeAverage) {
-        this.accumulationTypes.add(AccumulationType.SUM);
+        if (this.accumulationTypes == null) {
+          this.accumulationTypes = Sets.newHashSet(AccumulationType.SUM);
+        } else {
+          this.accumulationTypes.add(AccumulationType.SUM);
+        }
         this.includeCount = true;
       }
     }
@@ -113,7 +123,7 @@ public abstract class MultiAccumulation<InputT extends Number, AccumT> implement
 //  }
 
 
-  protected AccumulationValues defaultAccumulationValues;
+  protected AV defaultAccumulationValues;
 
   public void setAccumulateTypes(boolean includeCount, boolean includeAverage, AccumulationType ... accumulationTypes)
   {
@@ -121,13 +131,13 @@ public abstract class MultiAccumulation<InputT extends Number, AccumT> implement
   }
 
   @Override
-  public MultiAccumulation.AccumulationValues defaultAccumulatedValue()
+  public AV defaultAccumulatedValue()
   {
     return defaultAccumulationValues;
   }
 
   @Override
-  public AccumulationValues accumulate(AccumulationValues accumulatedValue, InputT input)
+  public AV accumulate(AV accumulatedValue, InputT input)
   {
     accumulatedValue.getCount().increment();
     accumulatedValue.accumulateValue(input);
@@ -136,9 +146,7 @@ public abstract class MultiAccumulation<InputT extends Number, AccumT> implement
 
 
   @Override
-  public AccumulationValues merge(
-      AccumulationValues accumulatedValue1,
-      AccumulationValues accumulatedValue2)
+  public AV merge(AV accumulatedValue1, AV accumulatedValue2)
   {
     accumulatedValue1.getCount().add(accumulatedValue2.getCount());
     accumulatedValue1.merge(accumulatedValue2);
@@ -146,13 +154,13 @@ public abstract class MultiAccumulation<InputT extends Number, AccumT> implement
   }
 
   @Override
-  public AccumulationValues getOutput(AccumulationValues accumulatedValue)
+  public AV getOutput(AV accumulatedValue)
   {
     return accumulatedValue;
   }
 
   @Override
-  public AccumulationValues getRetraction(AccumulationValues value)
+  public AV getRetraction(AccumulationValues value)
   {
     return null;
   }

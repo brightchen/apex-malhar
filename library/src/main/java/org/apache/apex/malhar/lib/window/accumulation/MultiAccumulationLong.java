@@ -18,15 +18,19 @@
  */
 package org.apache.apex.malhar.lib.window.accumulation;
 
-public class MultiAccumulationLong extends MultiAccumulation<Long, Long>
+public class MultiAccumulationLong extends MultiAccumulation<Long, Long, MultiAccumulationLong.AccumulationValuesLong>
 {
-  public static class AccumulationValuesLong extends AbstractAccumulationValues<Long, Long>
+  public static class AccumulationValuesLong extends MultiAccumulation.AbstractAccumulationValues<Long, Long>
   {
     @Override
     protected void accumulateValue(AccumulationType type, Long value)
     {
       Long oldValue = accumulationTypeToValue.get(type);
-      switch(type) {
+      if (oldValue == null) {
+        accumulationTypeToValue.put(type, value);
+        return;
+      }
+      switch (type) {
         case MAX:
           if (oldValue < value) {
             accumulationTypeToValue.put(type, value);
@@ -40,6 +44,8 @@ public class MultiAccumulationLong extends MultiAccumulation<Long, Long>
         case SUM:
           accumulationTypeToValue.put(type, oldValue + value);
           break;
+        default:
+          throw new RuntimeException("Unexpected AccumulationType");
       }
     }
 
