@@ -8,20 +8,30 @@ import com.google.common.collect.Lists;
 
 public class CompositeAccumulation<InputT> implements Accumulation<InputT, List, List>
 {
+  public static class AccumulationTag
+  {
+    private int index;
+    private AccumulationTag(int index)
+    {
+      this.index = index;
+    }
+  }
+
   private List<Accumulation<InputT, Object, ?>> accumulations = Lists.newArrayList();
 
   /**
    * @param accumulation
    * @return The index of this accumulation. So the client can get the value of sub accumulation by index
    */
-  public int addAccumulation(Accumulation<InputT, Object, ?> accumulation)
+  public AccumulationTag addAccumulation(Accumulation<InputT, Object, ?> accumulation)
   {
     accumulations.add(accumulation);
-    return accumulations.size() - 1;
+    return new AccumulationTag(accumulations.size() - 1);
   }
 
-  public Object getSubOutput(int index, List output)
+  public Object getSubOutput(AccumulationTag tag, List output)
   {
+    int index = tag.index;
     return accumulations.get(index).getOutput(output.get(index));
   }
 
