@@ -18,7 +18,6 @@
  */
 package org.apache.apex.malhar.lib.window.accumulation;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -26,9 +25,9 @@ import org.junit.Assert;
 import org.junit.Test;
 
 /**
- * Test for {@link PojoInnerJoin}.
+ * Test for POJO outer join accumulations
  */
-public class PojoInnerJoinTest
+public class PojoOuterJoinTest
 {
 
   public static class TestPojo1
@@ -205,9 +204,9 @@ public class PojoInnerJoinTest
 
 
   @Test
-  public void PojoInnerJoinTest()
+  public void PojoLeftOuterJoinTest()
   {
-    PojoInnerJoin<TestPojo1, TestPojo3> pij = new PojoInnerJoin<>(2, TestOutClass.class, "uId", "uId");
+    PojoLeftOuterJoin<TestPojo1, TestPojo3> pij = new PojoLeftOuterJoin<>(2, TestOutClass.class, "uId", "uId");
 
     List<List<Map<String, Object>>> accu = pij.defaultAccumulatedValue();
 
@@ -219,26 +218,20 @@ public class PojoInnerJoinTest
     accu = pij.accumulate2(accu, new TestPojo3(1, "NickJosh", 12));
     accu = pij.accumulate2(accu, new TestPojo3(3, "NickBob", 13));
 
-    Map<String, Object> result = new HashMap<>();
-    result.put("uId", 1);
-    result.put("uName", "Josh");
-    result.put("uNickName", "NickJosh");
-    result.put("age", 12);
+    Assert.assertEquals(2, pij.getOutput(accu).size());
 
-    Assert.assertEquals(1, pij.getOutput(accu).size());
-
-    Object o = pij.getOutput(accu).get(0);
+    Object o = pij.getOutput(accu).get(1);
     Assert.assertTrue(o instanceof TestOutClass);
     TestOutClass testOutClass = (TestOutClass)o;
-    Assert.assertEquals(1, testOutClass.getUId());
-    Assert.assertEquals("Josh", testOutClass.getUName());
-    Assert.assertEquals(12, testOutClass.getAge());
+    Assert.assertEquals(2, testOutClass.getUId());
+    Assert.assertEquals("Bob", testOutClass.getUName());
+    Assert.assertEquals(0, testOutClass.getAge());
   }
 
   @Test
-  public void PojoInnerJoinTestMultipleKeys()
+  public void PojoRightOuterJoinTest()
   {
-    PojoInnerJoin<TestPojo1, TestPojo3> pij = new PojoInnerJoin<>(2, TestOutMultipleKeysClass.class, "uId", "uId", "uName", "uNickName");
+    PojoRightOuterJoin<TestPojo1, TestPojo3> pij = new PojoRightOuterJoin<>(2, TestOutClass.class, "uId", "uId");
 
     List<List<Map<String, Object>>> accu = pij.defaultAccumulatedValue();
 
@@ -247,16 +240,41 @@ public class PojoInnerJoinTest
     accu = pij.accumulate(accu, new TestPojo1(1, "Josh"));
     accu = pij.accumulate(accu, new TestPojo1(2, "Bob"));
 
-    accu = pij.accumulate2(accu, new TestPojo3(1, "Josh", 12));
-    accu = pij.accumulate2(accu, new TestPojo3(3, "ECE", 13));
+    accu = pij.accumulate2(accu, new TestPojo3(1, "NickJosh", 12));
+    accu = pij.accumulate2(accu, new TestPojo3(3, "NickBob", 13));
 
-    Assert.assertEquals(1, pij.getOutput(accu).size());
+    Assert.assertEquals(2, pij.getOutput(accu).size());
 
-    Object o = pij.getOutput(accu).get(0);
-    Assert.assertTrue(o instanceof TestOutMultipleKeysClass);
-    TestOutMultipleKeysClass testOutClass = (TestOutMultipleKeysClass)o;
-    Assert.assertEquals(1, testOutClass.getUId());
-    Assert.assertEquals("Josh", testOutClass.getUName());
-    Assert.assertEquals(12, testOutClass.getAge());
+    Object o = pij.getOutput(accu).get(1);
+    Assert.assertTrue(o instanceof TestOutClass);
+    TestOutClass testOutClass = (TestOutClass)o;
+    Assert.assertEquals(3, testOutClass.getUId());
+    Assert.assertEquals(null, testOutClass.getUName());
+    Assert.assertEquals(13, testOutClass.getAge());
+  }
+
+  @Test
+  public void PojoFullOuterJoinTest()
+  {
+    PojoFullOuterJoin<TestPojo1, TestPojo3> pij = new PojoFullOuterJoin<>(2, TestOutClass.class, "uId", "uId");
+
+    List<List<Map<String, Object>>> accu = pij.defaultAccumulatedValue();
+
+    Assert.assertEquals(2, accu.size());
+
+    accu = pij.accumulate(accu, new TestPojo1(1, "Josh"));
+    accu = pij.accumulate(accu, new TestPojo1(2, "Bob"));
+
+    accu = pij.accumulate2(accu, new TestPojo3(1, "NickJosh", 12));
+    accu = pij.accumulate2(accu, new TestPojo3(3, "NickBob", 13));
+
+    Assert.assertEquals(3, pij.getOutput(accu).size());
+
+    Object o = pij.getOutput(accu).get(1);
+    Assert.assertTrue(o instanceof TestOutClass);
+    TestOutClass testOutClass = (TestOutClass)o;
+    Assert.assertEquals(2, testOutClass.getUId());
+    Assert.assertEquals("Bob", testOutClass.getUName());
+    Assert.assertEquals(0, testOutClass.getAge());
   }
 }
