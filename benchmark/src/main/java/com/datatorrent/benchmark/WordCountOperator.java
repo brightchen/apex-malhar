@@ -28,7 +28,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.datatorrent.api.Context.OperatorContext;
-
 import com.datatorrent.api.DefaultInputPort;
 import com.datatorrent.api.Operator;
 
@@ -53,16 +52,27 @@ public class WordCountOperator<T> implements Operator
   private long startmillis;
   private ArrayList<Integer> millis;
 
+  private long totalCount = 0;
+  private long totalMillis = 0;
+  private long initialTime = 0;
   @Override
   public void endWindow()
   {
+    long now = System.currentTimeMillis();
+    int spent = (int)(now - startmillis);
+    totalCount += count;
+    totalMillis += spent;
+
     counts.add(count);
-    millis.add((int)(System.currentTimeMillis() - startmillis));
+    millis.add(spent);
     count = 0;
 
     if (counts.size() % 10 == 0) {
       logger.info("millis = {}", millis);
       logger.info("counts = {}", counts);
+      long totalSpent = now - initialTime;
+      logger.info("total count: {}; total process millis: {}, rate1: {}; total millis:{}, rate2: {}", totalCount,
+          totalMillis, totalCount / totalMillis, totalSpent, totalCount / totalSpent);
       millis.clear();
       counts.clear();
     }
@@ -86,6 +96,7 @@ public class WordCountOperator<T> implements Operator
   {
     counts = new ArrayList<Integer>();
     millis = new ArrayList<Integer>();
+    initialTime = System.currentTimeMillis();
   }
 
   private static final Logger logger = LoggerFactory.getLogger(WordCountOperator.class);

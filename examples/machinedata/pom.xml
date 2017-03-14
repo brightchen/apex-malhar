@@ -26,12 +26,12 @@
   <packaging>jar</packaging>
 
   <name>Apache Apex Malhar MachineData Example</name>
-  <description></description>
+  <description />
 
   <parent>
     <groupId>org.apache.apex</groupId>
     <artifactId>malhar-examples</artifactId>
-    <version>3.7.0-SNAPSHOT</version>
+    <version>3.7.1-SNAPSHOT</version>
   </parent>
 
   <dependencies>
