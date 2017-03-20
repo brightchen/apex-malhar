@@ -71,8 +71,10 @@ public class WordCountOperator<T> implements Operator
       logger.info("millis = {}", millis);
       logger.info("counts = {}", counts);
       long totalSpent = now - initialTime;
-      logger.info("total count: {}; total process millis: {}, rate1: {}; total millis:{}, rate2: {}", totalCount,
-          totalMillis, totalCount / totalMillis, totalSpent, totalCount / totalSpent);
+      if (totalMillis > 0 && totalSpent > 0) {
+        logger.info("total count: {}; total process millis: {}, rate1: {}; total millis:{}, rate2: {}", totalCount,
+            totalMillis, totalCount / totalMillis, totalSpent, totalCount / totalSpent);
+      }
       millis.clear();
       counts.clear();
     }
